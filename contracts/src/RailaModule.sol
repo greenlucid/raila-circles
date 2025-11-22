@@ -57,6 +57,10 @@ contract RailaModule {
     // loans[lender][borrower]
     mapping(address => mapping(address => Loan)) public loans;
 
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
     function setSettings(UserLimits memory _limits) external {
         limits[msg.sender] = _limits;
     }
