@@ -21,7 +21,7 @@ interface ICirclesHub {
 
 contract RailaModule {
 
-    // Interest rates use Basis Points (denominator is 10_000)
+    // Interest rates use Basis Points, and denominator is 1e18
     struct UserLimits {
         uint256 lendingCap;
         uint256 minLendIR;
@@ -50,6 +50,8 @@ contract RailaModule {
 
     IERC20 immutable TOKEN;
     ICirclesHub immutable CIRCLES_HUB;
+
+    uint256 constant DENOMINATOR = 1e18;
 
     mapping(address => UserLimits) public limits;
     mapping(address => UserBalance) public balances;
@@ -161,10 +163,10 @@ contract RailaModule {
 
         if (loan.amount > 0) {
             uint256 elapsed = block.timestamp - loan.timestamp;
-            uint256 interest = loan.amount * loan.interestRatePerSecond * elapsed / 10_000;
+            uint256 interest = loan.amount * loan.interestRatePerSecond * elapsed / DENOMINATOR;
             loan.amount += interest;
 
-            uint256 d = interest * loan.interestRatePerSecond / 10_000;
+            uint256 d = interest * loan.interestRatePerSecond / DENOMINATOR;
             balances[lender].owedPerSecond += d;
             balances[borrower].owesPerSecond += d;
 
@@ -186,7 +188,7 @@ contract RailaModule {
     ) internal {
         Loan storage loan = loans[lender][borrower];
 
-        uint256 d = amount * ir / 10_000;
+        uint256 d = amount * ir / DENOMINATOR;
         balances[lender].owedPerSecond += d;
         balances[borrower].owesPerSecond += d;
 
@@ -211,7 +213,7 @@ contract RailaModule {
         Loan storage loan = loans[lender][borrower];
         repaid = offered < loan.amount ? offered : loan.amount;
 
-        uint256 d = repaid * loan.interestRatePerSecond / 10_000;
+        uint256 d = repaid * loan.interestRatePerSecond / DENOMINATOR;
         balances[lender].owedPerSecond -= d;
         balances[borrower].owesPerSecond -= d;
 
