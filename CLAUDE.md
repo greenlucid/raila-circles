@@ -59,3 +59,4 @@ Lets you know you need USDC to be able to lend in the first place. (Although you
 
 Circles: https://docs.aboutcircles.com/llms.txt
 Safe: https://docs.safe.global/llms.txt
+Foundry: https://getfoundry.sh/llms.txt
