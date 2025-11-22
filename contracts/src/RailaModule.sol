@@ -125,7 +125,23 @@ contract RailaModule {
         uint256 amount,
         address[] calldata path
     ) external {
-        // TODO
+        for (uint256 i = 0; i < path.length - 1; i++) {
+            address borrower = path[i];
+            address lender = path[i + 1];
+
+            updateLoan(lender, borrower);
+
+            uint256 repaid = _repay(lender, borrower, amount);
+
+            if (amount - repaid > 0 && i > 0) {
+                token.transferFrom(msg.sender, borrower, amount - repaid);
+            }
+            amount = repaid;
+        }
+
+        if (amount > 0) {
+            token.transferFrom(msg.sender, path[path.length - 1], amount);
+        }
     }
 
     function updateLoan(
@@ -163,6 +179,20 @@ contract RailaModule {
 
         balances[lender].lent += amount;
         balances[borrower].borrowed += amount;
+    }
+
+    // assume the loan is updated before calling this!
+    function _repay(
+        address lender,
+        address borrower,
+        uint256 offered
+    ) internal returns (uint256 repaid) {
+        Loan storage loan = loans[lender][borrower];
+        repaid = offered < loan.amount ? offered : loan.amount;
+
+        loan.amount -= repaid;
+        balances[lender].lent -= repaid;
+        balances[borrower].borrowed -= repaid;
     }
 
     error DifferentLengthsPathIRs(uint256 pathLength, uint256 irsLength);
