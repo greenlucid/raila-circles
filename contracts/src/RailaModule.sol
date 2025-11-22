@@ -2,8 +2,11 @@
 pragma solidity ^0.8.30;
 
 import {Enum} from "safe-contracts/contracts/libraries/Enum.sol";
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 contract RailaModule {
+
+    // Interest rates use Basis Points (denominator is 10_000)
     struct UserLimits {
         uint256 lendingCap;
         uint256 minLendIR;
@@ -30,6 +33,8 @@ contract RailaModule {
         uint256 timestamp;
     }
 
+    IERC20 immutable token;
+
     mapping(address => UserLimits) public limits;
     mapping(address => UserBalance) public balances;
     // loans[lender][borrower]
@@ -44,7 +49,17 @@ contract RailaModule {
         address[] calldata path,
         uint256[] calldata irs
     ) external {
-        // TODO
+        for (uint256 i = 0; i < path.length; i++) {
+            // original lender is first address in the path.
+            // caller (the safe) is the not included last element.
+            address sender = path[i];
+            address receiver = i < path.length - 1 ? path[i+1] : msg.sender; 
+
+            updateLoan(sender, receiver);
+            if (i != 0) {
+                _borrow(sender, receiver, amount, irs[i]);
+            }
+        }
     }
 
     function repay(
@@ -58,6 +73,36 @@ contract RailaModule {
         address lender,
         address borrower
     ) public {
-        // TODO
+        Loan storage loan = loans[lender][borrower];
+        if (loan.amount == 0) return;
+
+        uint256 elapsed = block.timestamp - loan.timestamp;
+        uint256 interest = loan.amount * loan.interestRatePerSecond * elapsed / 10_000;
+        loan.amount += interest;
+        loan.timestamp = block.timestamp;
+
+        balances[lender].lent += interest;
+        balances[lender].timestamp = block.timestamp;
+
+        balances[borrower].borrowed += interest;
+        balances[borrower].timestamp = block.timestamp;
+    }
+
+    // assume the loan is updated before calling this!
+    function _borrow(
+        address lender,
+        address borrower,
+        uint256 amount,
+        uint256 ir
+    ) internal {
+        Loan storage loan = loans[lender][borrower];
+        uint256 newIr = loan.amount == 0
+            ? ir
+            : (loan.amount * loan.interestRatePerSecond + amount * ir) / (loan.amount + amount);
+        loan.interestRatePerSecond = newIr;
+        loan.amount += amount;
+
+        balances[lender].lent += amount;
+        balances[borrower].borrowed += amount;
     }
 }
