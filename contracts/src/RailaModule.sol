@@ -23,9 +23,9 @@ contract RailaModule {
 
     struct Loan {
         uint256 amount;
-        // This is a demo, so for borrowing on an already existing loan,
-        // just overwrite IR with the latest one.
-        // More sense to ID the loans, maybe?
+        // borrowing on an already existing loan will
+        // mutate the borrow to the weighted average
+        // of the existing amount, and the borrowed amount
         uint256 interestRatePerSecond;
         uint256 timestamp;
     }
@@ -36,18 +36,28 @@ contract RailaModule {
     mapping(address => mapping(address => Loan)) public loans;
 
     function setSettings(UserLimits memory _limits) external {
+        limits[msg.sender] = _limits;
+    }
+
+    function borrow(
+        uint256 amount,
+        address[] calldata path,
+        uint256[] calldata irs
+    ) external {
         // TODO
     }
 
-    function borrow(uint256 amount, address[] calldata path, uint256[] calldata irs) external {
+    function repay(
+        uint256 amount,
+        address[] calldata path
+    ) external {
         // TODO
     }
 
-    function repay(/* params */) external {
-        // TODO
-    }
-
-    function updateLoan(/* params */) external {
+    function updateLoan(
+        address lender,
+        address borrower
+    ) public {
         // TODO
     }
 }
