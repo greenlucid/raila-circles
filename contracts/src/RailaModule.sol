@@ -13,7 +13,15 @@ interface ISafe {
     ) external returns (bool success);
 }
 
+interface ICirclesHub {
+    function isTrusted(
+        address _truster, address _trusted
+    ) external view returns (bool);
+}
+
 contract RailaModule {
+    ICirclesHub constant CIRCLES_HUB =
+        ICirclesHub(0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8);
 
     // Interest rates use Basis Points (denominator is 10_000)
     struct UserLimits {
@@ -95,7 +103,9 @@ contract RailaModule {
                 }
             }
 
-            // todo check lender trusts borrower in circles
+            if (!CIRCLES_HUB.isTrusted(sender, receiver)) {
+                revert LenderDoesNotTrustBorrower(sender, receiver);
+            }
         }
 
         bytes memory data = abi.encodeWithSelector(
@@ -161,5 +171,6 @@ contract RailaModule {
     error UnderLenderMinIR(address lender, uint256 ir);
     error OverBorrowerMaxIR(address borrower, uint256 ir);
     error UnderRelayerMargin(address borrower, uint256 margin);
+    error LenderDoesNotTrustBorrower(address lender, address borrower);
     error TransferFailed();
 }
