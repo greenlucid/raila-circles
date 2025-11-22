@@ -49,6 +49,10 @@ contract RailaModule {
         address[] calldata path,
         uint256[] calldata irs
     ) external {
+        if (path.length != irs.length) {
+            revert DifferentLengthsPathIRs(path.length, irs.length);
+        }
+        
         for (uint256 i = 0; i < path.length; i++) {
             // original lender is first address in the path.
             // caller (the safe) is the not included last element.
@@ -56,10 +60,32 @@ contract RailaModule {
             address receiver = i < path.length - 1 ? path[i+1] : msg.sender; 
 
             updateLoan(sender, receiver);
-            if (i != 0) {
-                _borrow(sender, receiver, amount, irs[i]);
+            _borrow(sender, receiver, amount, irs[i]);
+
+            if (balances[sender].lent > limits[sender].lendingCap) {
+                revert OverLendingCap(sender, balances[sender].lent);
             }
+            if (irs[i] < limits[sender].minLendIR) {
+                revert UnderLenderMinIR(sender, irs[i]);
+            }
+
+            if (balances[receiver].borrowed > limits[receiver].borrowCap) {
+                revert OverBorrowingCap(receiver, balances[receiver].borrowed);
+            }
+            if (irs[i] > limits[receiver].maxBorrowIR) {
+                revert OverBorrowerMaxIR(receiver, irs[i]);
+            }
+
+            if (i < path.length - 1) {
+                uint256 margin = irs[i + 1] - irs[i];
+                if (margin < limits[receiver].minIRMargin) {
+                    revert UnderRelayerMargin(receiver, margin);
+                }
+            }
+
+            // todo check lender trusts borrower in circles
         }
+        // todo transfer path[0] -> msg.sender
     }
 
     function repay(
@@ -105,4 +131,11 @@ contract RailaModule {
         balances[lender].lent += amount;
         balances[borrower].borrowed += amount;
     }
+
+    error DifferentLengthsPathIRs(uint256 pathLength, uint256 irsLength);
+    error OverLendingCap(address lender, uint256 amount);
+    error OverBorrowingCap(address borrower, uint256 amount);
+    error UnderLenderMinIR(address lender, uint256 ir);
+    error OverBorrowerMaxIR(address borrower, uint256 ir);
+    error UnderRelayerMargin(address borrower, uint256 margin);
 }
