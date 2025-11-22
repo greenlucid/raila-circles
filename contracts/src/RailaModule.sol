@@ -101,6 +101,9 @@ contract RailaModule {
                     revert OverBorrowerMaxIR(receiver, irs[i]);
                 }
 
+                if (irs[i + 1] < irs[i]) {
+                    revert UnderRelayerMargin(receiver, 0);
+                }
                 uint256 margin = irs[i + 1] - irs[i];
                 if (margin < limits[receiver].minIRMargin) {
                     revert UnderRelayerMargin(receiver, margin);
