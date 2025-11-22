@@ -164,6 +164,10 @@ contract RailaModule {
             uint256 interest = loan.amount * loan.interestRatePerSecond * elapsed / 10_000;
             loan.amount += interest;
 
+            uint256 d = interest * loan.interestRatePerSecond / 10_000;
+            balances[lender].owedPerSecond += d;
+            balances[borrower].owesPerSecond += d;
+
             balances[lender].lent += interest;
             balances[borrower].borrowed += interest;
         }
@@ -181,11 +185,18 @@ contract RailaModule {
         uint256 ir
     ) internal {
         Loan storage loan = loans[lender][borrower];
+
+        uint256 d = amount * ir / 10_000;
+        balances[lender].owedPerSecond += d;
+        balances[borrower].owesPerSecond += d;
+
+        uint256 newAmount = loan.amount + amount;
         uint256 newIr = loan.amount == 0
             ? ir
-            : (loan.amount * loan.interestRatePerSecond + amount * ir) / (loan.amount + amount);
+            : (loan.amount * loan.interestRatePerSecond + amount * ir) / newAmount;
+
+        loan.amount = newAmount;
         loan.interestRatePerSecond = newIr;
-        loan.amount += amount;
 
         balances[lender].lent += amount;
         balances[borrower].borrowed += amount;
@@ -199,6 +210,10 @@ contract RailaModule {
     ) internal returns (uint256 repaid) {
         Loan storage loan = loans[lender][borrower];
         repaid = offered < loan.amount ? offered : loan.amount;
+
+        uint256 d = repaid * loan.interestRatePerSecond / 10_000;
+        balances[lender].owedPerSecond -= d;
+        balances[borrower].owesPerSecond -= d;
 
         loan.amount -= repaid;
         balances[lender].lent -= repaid;
