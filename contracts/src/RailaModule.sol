@@ -20,8 +20,6 @@ interface ICirclesHub {
 }
 
 contract RailaModule {
-    ICirclesHub constant CIRCLES_HUB =
-        ICirclesHub(0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8);
 
     // Interest rates use Basis Points (denominator is 10_000)
     struct UserLimits {
@@ -50,15 +48,17 @@ contract RailaModule {
         uint256 timestamp;
     }
 
-    IERC20 immutable token;
+    IERC20 immutable TOKEN;
+    ICirclesHub immutable CIRCLES_HUB;
 
     mapping(address => UserLimits) public limits;
     mapping(address => UserBalance) public balances;
     // loans[lender][borrower]
     mapping(address => mapping(address => Loan)) public loans;
 
-    constructor(IERC20 _token) {
-        token = _token;
+    constructor(IERC20 _token, ICirclesHub _circlesHub) {
+        TOKEN = _token;
+        CIRCLES_HUB = _circlesHub;
     }
 
     function setSettings(UserLimits memory _limits) external {
@@ -122,7 +122,7 @@ contract RailaModule {
             amount
         );
         if (!ISafe(path[0]).execTransactionFromModule(
-            address(token),
+            address(TOKEN),
             0,
             data,
             Enum.Operation.Call
@@ -143,13 +143,13 @@ contract RailaModule {
             uint256 repaid = _repay(lender, borrower, amount);
 
             if (amount - repaid > 0 && i > 0) {
-                token.transferFrom(msg.sender, borrower, amount - repaid);
+                TOKEN.transferFrom(msg.sender, borrower, amount - repaid);
             }
             amount = repaid;
         }
 
         if (amount > 0) {
-            token.transferFrom(msg.sender, path[path.length - 1], amount);
+            TOKEN.transferFrom(msg.sender, path[path.length - 1], amount);
         }
     }
 
