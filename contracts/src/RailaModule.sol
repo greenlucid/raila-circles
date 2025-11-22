@@ -158,17 +158,18 @@ contract RailaModule {
         address borrower
     ) public {
         Loan storage loan = loans[lender][borrower];
-        if (loan.amount == 0) return;
 
-        uint256 elapsed = block.timestamp - loan.timestamp;
-        uint256 interest = loan.amount * loan.interestRatePerSecond * elapsed / 10_000;
-        loan.amount += interest;
+        if (loan.amount > 0) {
+            uint256 elapsed = block.timestamp - loan.timestamp;
+            uint256 interest = loan.amount * loan.interestRatePerSecond * elapsed / 10_000;
+            loan.amount += interest;
+
+            balances[lender].lent += interest;
+            balances[borrower].borrowed += interest;
+        }
+
         loan.timestamp = block.timestamp;
-
-        balances[lender].lent += interest;
         balances[lender].timestamp = block.timestamp;
-
-        balances[borrower].borrowed += interest;
         balances[borrower].timestamp = block.timestamp;
     }
 
