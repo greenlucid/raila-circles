@@ -4,6 +4,15 @@ pragma solidity ^0.8.30;
 import {Enum} from "safe-contracts/contracts/libraries/Enum.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
+interface ISafe {
+    function execTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) external returns (bool success);
+}
+
 contract RailaModule {
 
     // Interest rates use Basis Points (denominator is 10_000)
@@ -69,14 +78,17 @@ contract RailaModule {
                 revert UnderLenderMinIR(sender, irs[i]);
             }
 
-            if (balances[receiver].borrowed > limits[receiver].borrowCap) {
-                revert OverBorrowingCap(receiver, balances[receiver].borrowed);
-            }
-            if (irs[i] > limits[receiver].maxBorrowIR) {
-                revert OverBorrowerMaxIR(receiver, irs[i]);
-            }
-
             if (i < path.length - 1) {
+                // As original borrower, you can exceed your safety limits
+                // since you're purposely calling this.
+                // Borrowing limits only apply while relaying the loan.
+                if (balances[receiver].borrowed > limits[receiver].borrowCap) {
+                    revert OverBorrowingCap(receiver, balances[receiver].borrowed);
+                }
+                if (irs[i] > limits[receiver].maxBorrowIR) {
+                    revert OverBorrowerMaxIR(receiver, irs[i]);
+                }
+
                 uint256 margin = irs[i + 1] - irs[i];
                 if (margin < limits[receiver].minIRMargin) {
                     revert UnderRelayerMargin(receiver, margin);
@@ -85,7 +97,18 @@ contract RailaModule {
 
             // todo check lender trusts borrower in circles
         }
-        // todo transfer path[0] -> msg.sender
+
+        bytes memory data = abi.encodeWithSelector(
+            IERC20.transfer.selector,
+            msg.sender,
+            amount
+        );
+        if (!ISafe(path[0]).execTransactionFromModule(
+            address(token),
+            0,
+            data,
+            Enum.Operation.Call
+        )) revert TransferFailed();
     }
 
     function repay(
@@ -138,4 +161,5 @@ contract RailaModule {
     error UnderLenderMinIR(address lender, uint256 ir);
     error OverBorrowerMaxIR(address borrower, uint256 ir);
     error UnderRelayerMargin(address borrower, uint256 margin);
+    error TransferFailed();
 }
