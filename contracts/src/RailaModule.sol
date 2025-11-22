@@ -70,6 +70,7 @@ contract RailaModule {
         address[] calldata path,
         uint256[] calldata irs
     ) external {
+        if (path.length == 0) revert EmptyPath();
         if (path.length != irs.length) {
             revert DifferentLengthsPathIRs(path.length, irs.length);
         }
@@ -132,6 +133,7 @@ contract RailaModule {
         uint256 amount,
         address[] calldata path
     ) external {
+        if (path.length == 0) revert EmptyPath();
         for (uint256 i = 0; i < path.length - 1; i++) {
             address borrower = path[i];
             address lender = path[i + 1];
@@ -202,6 +204,7 @@ contract RailaModule {
         balances[borrower].borrowed -= repaid;
     }
 
+    error EmptyPath();
     error DifferentLengthsPathIRs(uint256 pathLength, uint256 irsLength);
     error OverLendingCap(address lender, uint256 amount);
     error OverBorrowingCap(address borrower, uint256 amount);
