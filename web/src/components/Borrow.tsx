@@ -1,55 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { Sdk } from '@aboutcircles/sdk'
-import { circlesConfig } from '@aboutcircles/sdk-core'
-import { useQuery } from '@tanstack/react-query'
-import { createPublicClient, http, formatUnits, parseUnits } from 'viem'
-import { gnosis } from 'wagmi/chains'
-import { MODULE_ADDRESS, SAFE_ABI, USDC_ADDRESS, ERC20_ABI } from '../config/constants'
-
-interface LenderInfo {
-  address: string
-  name?: string
-  image?: string
-  lendingCap: bigint
-  minLendIR: number // APR %
-  minLendIRRaw: bigint // Raw value from contract
-  available: bigint // after 2% safety margin
-  usdcBalance: bigint
-  // Debug info
-  lent: bigint
-  owedPerSecond: bigint
-  timestamp: bigint
-  currentLent: bigint
-  capRemaining: bigint
-  rawAvailable: bigint
-}
+import { formatUnits, parseUnits } from 'viem'
+import { useLendingPaths } from '../hooks/useLendingPaths'
+import type { LiquidityTier, EnrichedLendingPath } from '../hooks/useLendingPaths'
+import { MODULE_ADDRESS } from '../config/constants'
 
 const MODULE_ABI = [{
-  name: 'limits',
-  type: 'function',
-  stateMutability: 'view',
-  inputs: [{ name: 'user', type: 'address' }],
-  outputs: [
-    { name: 'lendingCap', type: 'uint256' },
-    { name: 'minLendIR', type: 'uint256' },
-    { name: 'borrowCap', type: 'uint256' },
-    { name: 'maxBorrowIR', type: 'uint256' },
-    { name: 'minIRMargin', type: 'uint256' },
-  ],
-}, {
-  name: 'balances',
-  type: 'function',
-  stateMutability: 'view',
-  inputs: [{ name: 'user', type: 'address' }],
-  outputs: [
-    { name: 'lent', type: 'uint256' },
-    { name: 'owedPerSecond', type: 'uint256' },
-    { name: 'borrowed', type: 'uint256' },
-    { name: 'owesPerSecond', type: 'uint256' },
-    { name: 'timestamp', type: 'uint256' },
-  ],
-}, {
   name: 'borrow',
   type: 'function',
   stateMutability: 'nonpayable',
@@ -61,257 +17,351 @@ const MODULE_ABI = [{
   outputs: [],
 }] as const
 
-const publicClient = createPublicClient({
-  chain: gnosis,
-  transport: http(),
-})
-
 export function Borrow() {
   const { address } = useAccount()
-  const [trustedByAddresses, setTrustedByAddresses] = useState<string[]>([])
-  const [loadingTrust, setLoadingTrust] = useState(true)
+  const [viewMode, setViewMode] = useState<'orderbook' | 'detailed'>('orderbook')
 
-  // Fetch trust relations
-  useEffect(() => {
-    if (!address) return
-
-    const loadTrustRelations = async () => {
-      try {
-        setLoadingTrust(true)
-        const sdk = new Sdk(circlesConfig[100])
-        const relations = await sdk.data.getTrustRelations(address)
-
-        // Filter for those who trust YOU (trustedBy or mutuallyTrusts)
-        const trusters = relations
-          .filter((rel: any) =>
-            rel.relation === 'trustedBy' || rel.relation === 'mutuallyTrusts'
-          )
-          .map((rel: any) =>
-            rel.subjectAvatar === address ? rel.objectAvatar : rel.subjectAvatar
-          )
-
-        console.log('People who trust you:', trusters)
-        setTrustedByAddresses(trusters)
-      } catch (err) {
-        console.error('Failed to load trust relations:', err)
-      } finally {
-        setLoadingTrust(false)
-      }
-    }
-
-    loadTrustRelations()
-  }, [address])
-
-  // Two-stage approach: first filter by module enabled, then fetch full data
-  const { data: lenders, isLoading: loadingLenders } = useQuery({
-    queryKey: ['lenders', trustedByAddresses],
-    queryFn: async () => {
-      if (trustedByAddresses.length === 0) return []
-
-      const sdk = new Sdk(circlesConfig[100])
-
-      // Stage 1: Check which addresses have module enabled
-      const moduleCheckContracts = trustedByAddresses.map(addr => ({
-        address: addr as `0x${string}`,
-        abi: SAFE_ABI,
-        functionName: 'isModuleEnabled',
-        args: [MODULE_ADDRESS as `0x${string}`],
-      }))
-
-      console.log(`Stage 1: Checking module enabled for ${trustedByAddresses.length} addresses`)
-      const moduleResults = await publicClient.multicall({ contracts: moduleCheckContracts })
-
-      // Filter to only addresses with module enabled
-      const enabledAddresses = trustedByAddresses.filter((_, i) =>
-        moduleResults[i].status === 'success' && moduleResults[i].result === true
-      )
-
-      console.log(`Found ${enabledAddresses.length} addresses with module enabled`)
-      if (enabledAddresses.length === 0) return []
-
-      // Stage 2: Fetch full data for enabled addresses + metadata in parallel
-      const dataContracts = enabledAddresses.flatMap(addr => [
-        {
-          address: MODULE_ADDRESS as `0x${string}`,
-          abi: MODULE_ABI,
-          functionName: 'limits',
-          args: [addr as `0x${string}`],
-        },
-        {
-          address: MODULE_ADDRESS as `0x${string}`,
-          abi: MODULE_ABI,
-          functionName: 'balances',
-          args: [addr as `0x${string}`],
-        },
-        {
-          address: USDC_ADDRESS as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: 'balanceOf',
-          args: [addr as `0x${string}`],
-        },
-      ])
-
-      console.log(`Stage 2: Fetching data for ${enabledAddresses.length} enabled addresses`)
-
-      const [dataResults, block, profiles] = await Promise.all([
-        publicClient.multicall({ contracts: dataContracts }),
-        publicClient.getBlock(),
-        Promise.all(enabledAddresses.map(async (addr) => {
-          try {
-            const avatarData = await sdk.data.getAvatar(addr as `0x${string}`)
-            if (avatarData?.cidV0) {
-              const profile = await sdk.profiles.get(avatarData.cidV0)
-              return { addr, name: profile?.name, image: profile?.previewImageUrl }
-            }
-          } catch {
-            // Profile fetch failed, continue without metadata
-          }
-          return { addr, name: undefined, image: undefined }
-        }))
-      ])
-
-      const now = block.timestamp
-      const profileMap = new Map(profiles.map(p => [p.addr, p]))
-
-      // Parse results
-      const lenderInfos: LenderInfo[] = []
-      for (let i = 0; i < enabledAddresses.length; i++) {
-        const addr = enabledAddresses[i]
-        const limitsResult = dataResults[i * 3]
-        const balancesResult = dataResults[i * 3 + 1]
-        const usdcBalanceResult = dataResults[i * 3 + 2]
-
-        if (
-          limitsResult.status === 'success' &&
-          balancesResult.status === 'success' &&
-          usdcBalanceResult.status === 'success'
-        ) {
-          const limits = limitsResult.result as unknown as readonly [bigint, bigint, bigint, bigint, bigint]
-          const balances = balancesResult.result as unknown as readonly [bigint, bigint, bigint, bigint, bigint]
-          const usdcBalance = usdcBalanceResult.result as bigint
-
-          const lendingCap = limits[0]  // 6 decimals
-          const minLendIR = limits[1]
-          const lent = balances[0]  // 6 decimals
-          const owedPerSecond = balances[1]
-          const timestamp = balances[4]
-
-          // Skip if no lending cap configured
-          if (lendingCap === 0n) continue
-
-          // Calculate current lent with accrued interest
-          const elapsed = now - timestamp
-          const accruedInterest = owedPerSecond * elapsed
-          const currentLent = lent + accruedInterest
-
-          // Available = min(lendingCap - currentLent, usdcBalance)
-          const capRemaining = lendingCap > currentLent ? lendingCap - currentLent : 0n
-          const rawAvailable = capRemaining < usdcBalance ? capRemaining : usdcBalance
-
-          // Apply 2% safety margin
-          const available = (rawAvailable * 98n) / 100n
-
-          // Skip if no available capacity
-          if (available === 0n) continue
-
-          const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
-          const minLendIRPercent = Number(minLendIR) / 1e18 * SECONDS_PER_YEAR * 100
-
-          const profile = profileMap.get(addr)
-
-          lenderInfos.push({
-            address: addr,
-            name: profile?.name,
-            image: profile?.image,
-            lendingCap,
-            minLendIR: minLendIRPercent,
-            minLendIRRaw: minLendIR,
-            available,
-            usdcBalance,
-            lent,
-            owedPerSecond,
-            timestamp,
-            currentLent,
-            capRemaining,
-            rawAvailable,
-          })
-        }
-      }
-
-      return lenderInfos
-    },
-    enabled: !loadingTrust && trustedByAddresses.length > 0,
-  })
+  const { data: tiers, isLoading, error, currentDepth } = useLendingPaths(address)
 
   if (!address) return null
 
-  if (loadingTrust) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Borrow from your Circle</h2>
-        <p className="text-gray-500">Loading trust network...</p>
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Borrow Liquidity</h2>
+
+        {/* View toggle */}
+        {tiers.length > 0 && (
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('orderbook')}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                viewMode === 'orderbook'
+                  ? 'bg-white text-[#ff6b35] shadow'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Orderbook
+            </button>
+            <button
+              onClick={() => setViewMode('detailed')}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                viewMode === 'detailed'
+                  ? 'bg-white text-[#ff6b35] shadow'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Detailed
+            </button>
+          </div>
+        )}
       </div>
-    )
+
+      {error && (
+        <p className="text-red-600">Error: {error.message}</p>
+      )}
+
+      {!error && (
+        <>
+          {!isLoading && tiers.length === 0 && (
+            <p className="text-gray-500">
+              No lending paths found. Try expanding your trust network or ask trusted contacts to enable the Raila module.
+            </p>
+          )}
+
+          {/* Show initial skeleton when first loading */}
+          {isLoading && tiers.length === 0 && (
+            <div className="border-2 border-gray-200 rounded-lg p-4 animate-pulse">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-20"></div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+              <div className="pt-3 border-t">
+                <div className="h-3 bg-gray-200 rounded w-24 mb-2"></div>
+                <div className="flex gap-2">
+                  <div className="flex-1 h-10 bg-gray-200 rounded"></div>
+                  <div className="w-24 h-10 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Show tiers as they're discovered */}
+          {tiers.length > 0 && (
+            <>
+              {viewMode === 'orderbook' ? (
+                <OrderbookView tiers={tiers} borrowerAddress={address} />
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Liquidity available at {tiers.length} rate tier{tiers.length !== 1 ? 's' : ''}
+                  </p>
+
+                  <div className="space-y-3">
+                    {tiers.map((tier, idx) => (
+                      <TierCard key={idx} tier={tier} borrowerAddress={address} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Loading indicator at the bottom (when we already have tiers) */}
+          {isLoading && tiers.length > 0 && (
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
+              <div className="animate-spin h-3 w-3 border-2 border-[#ff6b35] border-t-transparent rounded-full"></div>
+              <span>
+                {currentDepth !== null
+                  ? `Checking distance ${currentDepth + 1}...`
+                  : 'Starting pathfinding...'}
+              </span>
+            </div>
+          )}
+
+          {!isLoading && tiers.length > 0 && (
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              No more liquidity found
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
+
+function formatIR(ir: bigint): string {
+  const aprPercent = Number(ir) / 1e18 * SECONDS_PER_YEAR * 100
+  return aprPercent.toFixed(2)
+}
+
+function OrderbookView({ tiers }: { tiers: LiquidityTier[]; borrowerAddress: string }) {
+  const [borrowAmount, setBorrowAmount] = useState('')
+
+  const { writeContract, data: hash, isPending } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+
+  // Calculate max liquidity for bar sizing
+  const maxLiquidity = tiers.length > 0
+    ? Math.max(...tiers.map(t => Number(formatUnits(t.totalAvailable, 6))))
+    : 0
+
+  // Calculate weighted average APR and max APR for the borrow amount
+  const borrowAmountBigInt = borrowAmount ? parseUnits(borrowAmount, 6) : 0n
+  let remainingAmount = borrowAmountBigInt
+  let weightedSum = 0
+  let maxAPR = 0
+  const selectedTiers: Array<{ tier: LiquidityTier; amount: bigint }> = []
+
+  for (const tier of tiers) {
+    if (remainingAmount === 0n) break
+
+    const tierAmount = tier.totalAvailable > remainingAmount ? remainingAmount : tier.totalAvailable
+    selectedTiers.push({ tier, amount: tierAmount })
+
+    weightedSum += Number(tierAmount) * tier.interestRateAPR
+    maxAPR = tier.interestRateAPR
+    remainingAmount -= tierAmount
   }
 
-  if (trustedByAddresses.length === 0) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Borrow from your Circle</h2>
-        <p className="text-gray-500">None of the people who trust you have the module enabled</p>
-      </div>
-    )
-  }
+  const avgAPR = borrowAmountBigInt > 0n
+    ? weightedSum / Number(borrowAmountBigInt)
+    : 0
 
-  if (loadingLenders) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Borrow from your Circle</h2>
-        <p className="text-gray-500">Checking lending availability...</p>
-      </div>
-    )
-  }
+  const handleBorrow = () => {
+    if (!borrowAmount || selectedTiers.length === 0) return
 
-  const availableLenders = lenders || []
+    try {
+      const amountInTokens = parseUnits(borrowAmount, 6)
 
-  if (availableLenders.length === 0) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Borrow from your Circle</h2>
-        <p className="text-gray-500">
-          None of your trusted contacts have the module enabled
-        </p>
-      </div>
-    )
+      // Use first path from first tier that has enough liquidity
+      // TODO: Smart path selection across multiple tiers
+      const firstTier = selectedTiers[0].tier
+      const selectedPath = firstTier.paths.find(path => path.sourceUSDC >= amountInTokens)
+
+      if (!selectedPath) {
+        alert('Not enough liquidity in a single path for this amount')
+        return
+      }
+
+      writeContract({
+        address: MODULE_ADDRESS as `0x${string}`,
+        abi: MODULE_ABI,
+        functionName: 'borrow',
+        args: [
+          amountInTokens,
+          selectedPath.path as `0x${string}`[],
+          selectedPath.irs,
+        ],
+      })
+    } catch (err) {
+      console.error('Failed to borrow:', err)
+      alert('Invalid borrow amount')
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Available Lenders</h2>
-        <p className="text-sm text-gray-600 mb-6">
-          {availableLenders.length} contact{availableLenders.length !== 1 ? 's' : ''} available to lend
-        </p>
+    <div className="flex gap-4">
+      {/* Orderbook depth chart - 60% */}
+      <div className="flex-[3]">
+        <div className="space-y-1">
+          {tiers.map((tier, idx) => {
+            const amount = parseFloat(formatUnits(tier.totalAvailable, 6))
+            const percentage = (amount / maxLiquidity) * 100
 
-        <div className="space-y-3">
-          {availableLenders.map(lender => (
-            <LenderCard key={lender.address} lender={lender} />
-          ))}
+            return (
+              <div
+                key={idx}
+                className="relative flex items-center justify-between py-2 px-3 rounded hover:bg-gray-50 transition-colors group"
+              >
+                {/* Background bar */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-100 to-orange-50 rounded transition-all"
+                  style={{ width: `${percentage}%` }}
+                />
+
+                {/* Content */}
+                <div className="relative z-10 flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-mono font-semibold text-gray-700">
+                      {amount.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {tier.lenderCount} source{tier.lenderCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <span className="text-sm font-bold text-[#ff6b35]">
+                    {tier.interestRateAPR.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Borrow input panel - 40% */}
+      <div className="flex-[2] border-2 border-gray-200 rounded-lg p-4 relative">
+        <div className="absolute inset-0 bg-gray-50 bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+          <div className="text-center px-4">
+            <div className="bg-yellow-100 border-2 border-yellow-300 rounded-lg p-4 shadow-lg">
+              <p className="text-sm font-bold text-yellow-800 mb-1">🚧 WIP</p>
+              <p className="text-xs text-yellow-700">
+                Please use <span className="font-semibold">Detailed</span> view to choose a specific path!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <label className="block text-xs text-gray-600 mb-2 font-semibold">Amount to borrow</label>
+
+        <div className="flex items-center border-2 rounded-lg focus-within:border-[#ff6b35] transition-colors mb-3 opacity-50">
+          <input
+            type="text"
+            value={borrowAmount}
+            onChange={(e) => setBorrowAmount(e.target.value)}
+            className="flex-1 px-3 py-2 text-sm border-0 outline-none"
+            placeholder="0.00"
+            disabled
+          />
+          <span className="px-3 text-xs text-gray-500 border-l-2 bg-gray-50 font-semibold">USDC.e</span>
+        </div>
+
+        {borrowAmountBigInt > 0n && (
+          <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200 opacity-50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-600">Avg APR</span>
+              <span className="text-sm font-bold text-gray-700">{avgAPR.toFixed(2)}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-600">Max APR</span>
+              <span className="text-sm font-bold text-[#ff6b35]">{maxAPR.toFixed(2)}%</span>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={handleBorrow}
+          disabled
+          className="w-full bg-[#ff6b35] text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+        >
+          {isPending || isConfirming ? 'Borrowing...' : 'Borrow'}
+        </button>
+
+        {remainingAmount > 0n && borrowAmountBigInt > 0n && (
+          <p className="text-xs text-red-600 mt-2 opacity-50">
+            Not enough liquidity (short {formatUnits(remainingAmount, 6)} USDC.e)
+          </p>
+        )}
+
+        {hash && (
+          <div className="text-xs text-gray-600 mt-2 font-mono opacity-50">
+            Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+            {isConfirming && ' (confirming...)'}
+            {isSuccess && ' ✓'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TierCard({ tier, borrowerAddress }: { tier: LiquidityTier; borrowerAddress: string }) {
+  const totalAvailableFormatted = parseFloat(formatUnits(tier.totalAvailable, 6)).toFixed(2)
+
+  // Sort paths by liquidity (highest first) for display
+  const sortedPaths = [...tier.paths].sort((a, b) => Number(b.sourceUSDC - a.sourceUSDC))
+
+  return (
+    <div className="border-2 border-gray-200 rounded-lg p-4 hover:border-[#ff6b35] transition-colors">
+      {/* Individual path cards */}
+      <div className="space-y-3 mb-3 max-w-2xl">
+        {sortedPaths.map((path, idx) => (
+          <PathCard key={idx} path={path} borrowerAddress={borrowerAddress} />
+        ))}
+      </div>
+
+      {/* Aggregated tier summary */}
+      <div className="pt-3 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Total at {tier.interestRateAPR.toFixed(2)}% APR</p>
+            <p className="text-sm font-semibold text-gray-700">
+              {tier.lenderCount} source{tier.lenderCount !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold text-green-600">
+              {totalAvailableFormatted} USDC.e
+            </p>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function LenderCard({ lender }: { lender: LenderInfo }) {
-  const { address: borrowerAddress } = useAccount()
+function PathCard({ path, borrowerAddress }: { path: EnrichedLendingPath; borrowerAddress: string }) {
   const [borrowAmount, setBorrowAmount] = useState('')
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const { writeContract, data: hash, isPending } = useWriteContract()
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
   const handleBorrow = () => {
-    if (!borrowerAddress || !borrowAmount) return
+    if (!borrowAmount) return
 
     try {
       const amountInTokens = parseUnits(borrowAmount, 6)
@@ -322,8 +372,8 @@ function LenderCard({ lender }: { lender: LenderInfo }) {
         functionName: 'borrow',
         args: [
           amountInTokens,
-          [lender.address as `0x${string}`], // path: just the lender
-          [lender.minLendIRRaw], // irs: use their minimum rate
+          path.path as `0x${string}`[],
+          path.irs,
         ],
       })
     } catch (err) {
@@ -333,56 +383,138 @@ function LenderCard({ lender }: { lender: LenderInfo }) {
   }
 
   const handleBorrowMax = () => {
-    setBorrowAmount(formatUnits(lender.available, 6))
+    setBorrowAmount(formatUnits(path.sourceUSDC, 6))
   }
 
-  const maxBorrow = parseFloat(formatUnits(lender.available, 6)).toFixed(2)
+  const maxBorrow = parseFloat(formatUnits(path.sourceUSDC, 6)).toFixed(2)
+  const finalIR = path.irs[path.irs.length - 1]
+
+  // Build path visualization showing each hop with interest rates
+  const pathHops = path.path.map((addr, i) => {
+    const profile = path.profiles[i]
+    const nextIR = path.irs[i]
+
+    return { address: addr, profile, ir: nextIR }
+  })
 
   return (
-    <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-      <div className="flex items-center justify-between">
+    <div className="border-2 border-gray-200 rounded-lg p-4 hover:border-[#ff6b35] transition-colors">
+      {/* Header: Source and Final Rate */}
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          {lender.image ? (
+          {path.sourceImage ? (
             <img
-              src={lender.image}
-              alt={lender.name || 'Avatar'}
-              className="w-12 h-12 rounded-full object-cover"
+              src={path.sourceImage}
+              alt={path.sourceName || 'Source'}
+              className="w-10 h-10 rounded-full object-cover"
             />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
               <span className="text-gray-600 text-xs font-mono">
-                {lender.address.slice(2, 4)}
+                {path.path[0].slice(2, 4)}
               </span>
             </div>
           )}
 
           <div>
-            {lender.name && (
-              <p className="font-semibold text-sm">{lender.name}</p>
-            )}
-            <a
-              href={`https://gnosisscan.io/address/${lender.address}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-gray-500 font-mono hover:text-gray-700 hover:underline"
-            >
-              {lender.address.slice(0, 6)}...{lender.address.slice(-4)}
-            </a>
+            <p className="font-semibold text-sm">
+              {path.sourceName || `${path.path[0].slice(0, 6)}...${path.path[0].slice(-4)}`}
+            </p>
+            <p className="text-xs text-gray-500">
+              {path.path.length === 1 ? 'Direct lender' : `${path.path.length}-hop path`}
+            </p>
           </div>
         </div>
 
         <div className="text-right">
           <p className="text-sm font-semibold text-green-600">
-            {parseFloat(formatUnits(lender.available, 6)).toFixed(2)} USDC.e
+            {maxBorrow} USDC.e
           </p>
           <p className="text-xs text-gray-500">
-            @ {lender.minLendIR.toFixed(2)}% APR
+            @ {formatIR(finalIR)}% APR
           </p>
         </div>
       </div>
 
+      {/* Path visualization (collapsible) */}
+      {path.path.length > 1 && (
+        <div className="mb-3">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-[#ff6b35] hover:text-[#ff5722] font-semibold flex items-center gap-1"
+          >
+            {isExpanded ? '▼' : '▶'} {isExpanded ? 'Hide' : 'Show'} path details
+          </button>
+
+          {isExpanded && (
+            <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                {pathHops.map((hop, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-gray-300">
+                      {hop.profile?.image && (
+                        <img
+                          src={hop.profile.image}
+                          alt={hop.profile.name || hop.address}
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="font-mono">
+                        {hop.profile?.name || `${hop.address.slice(0, 4)}...${hop.address.slice(-2)}`}
+                      </span>
+                    </div>
+
+                    {i < pathHops.length - 1 ? (
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <span>→</span>
+                        <span className="font-semibold text-[#ff6b35]">{formatIR(hop.ir)}%</span>
+                        <span>→</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <span>→</span>
+                        <span className="font-semibold text-[#ff6b35]">{formatIR(hop.ir)}%</span>
+                        <span>→</span>
+                        <span className="font-mono bg-blue-100 px-2 py-1 rounded border border-blue-300">
+                          You
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Show margins for multi-hop */}
+              {path.path.length > 1 && (
+                <div className="mt-2 pt-2 border-t border-gray-300 space-y-1">
+                  {path.path.slice(1).map((addr, i) => {
+                    const profile = path.profiles[i + 1]
+                    const payIR = path.irs[i]
+                    const earnIR = path.irs[i + 1]
+                    const margin = earnIR - payIR
+
+                    return (
+                      <div key={i} className="text-xs text-gray-600 flex items-center gap-1">
+                        <span className="font-mono">
+                          {profile?.name || `${addr.slice(0, 4)}...${addr.slice(-2)}`}
+                        </span>
+                        <span>makes</span>
+                        <span className="font-semibold text-green-600">
+                          {formatIR(margin)}%
+                        </span>
+                        <span>margin</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Borrow Form */}
-      <div className="mt-4 pt-4 border-t">
+      <div className="pt-3 border-t">
         <label className="block text-xs text-gray-600 mb-2">Amount to borrow</label>
         <div className="flex gap-2">
           <div className="flex-1">
@@ -422,46 +554,6 @@ function LenderCard({ lender }: { lender: LenderInfo }) {
           </div>
         )}
       </div>
-
-      {/* Debug info */}
-      {/* <div className="mt-3 pt-3 border-t text-xs font-mono space-y-1">
-        <div className="flex justify-between">
-          <span className="text-gray-500">USDC Balance:</span>
-          <span>{formatUnits(lender.usdcBalance, 6)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Lending Cap:</span>
-          <span>{formatUnits(lender.lendingCap, 6)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Lent:</span>
-          <span>{formatUnits(lender.lent, 6)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Owed/sec:</span>
-          <span>{lender.owedPerSecond.toString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Timestamp:</span>
-          <span>{lender.timestamp.toString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Current Lent:</span>
-          <span>{formatUnits(lender.currentLent, 6)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Cap Remaining:</span>
-          <span>{formatUnits(lender.capRemaining, 6)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Raw Available:</span>
-          <span>{formatUnits(lender.rawAvailable, 6)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Available (98%):</span>
-          <span>{formatUnits(lender.available, 6)}</span>
-        </div>
-      </div> */}
     </div>
   )
 }

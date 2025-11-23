@@ -114,129 +114,163 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
   return (
     <>
       {isConfigured ? (
-        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <h2 className="text-lg font-bold mb-4">Current Settings</h2>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Max lending:</span>
-              <span className="font-semibold">{parseFloat(currentLendingCap).toFixed(2)} USDC.e @ {currentMinLendIR}%</span>
+        <div className="bg-gradient-to-br from-white to-gray-50 p-5 rounded-xl shadow-lg border border-gray-100 mb-6">
+          <h2 className="text-base font-bold mb-3 text-gray-800">Current Settings</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">Max Lending</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-bold text-[#ff6b35]">{parseFloat(currentLendingCap).toFixed(2)}</span>
+                <span className="text-xs text-gray-600">USDC.e</span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-1">
+                <span className="text-xs text-gray-500">Min rate:</span>
+                <span className="text-xs font-semibold text-green-600">{currentMinLendIR}%</span>
+              </div>
             </div>
-            {parseFloat(currentBorrowCap) > 0 && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Relaying:</span>
-                <span className="font-semibold">{parseFloat(currentBorrowCap).toFixed(2)} USDC.e @ max {currentMaxBorrowIR}% (margin {currentMinIRMargin}%)</span>
+
+            {parseFloat(currentBorrowCap) > 0 ? (
+              <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">Relaying</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl font-bold text-blue-600">{parseFloat(currentBorrowCap).toFixed(2)}</span>
+                  <span className="text-xs text-gray-600">USDC.e</span>
+                </div>
+                <div className="mt-1.5 space-y-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500">Max rate:</span>
+                    <span className="text-xs font-semibold text-orange-600">{currentMaxBorrowIR}%</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500">Margin:</span>
+                    <span className="text-xs font-semibold text-green-600">{currentMinIRMargin}%</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-100 rounded-lg p-3 border border-gray-200 flex items-center justify-center">
+                <span className="text-xs text-gray-400">No relaying</span>
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <div className="text-sm text-gray-600">
-            You haven't configured your lending settings yet
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-xl shadow-lg border border-orange-200 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#ff6b35] flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Ready to start lending?</p>
+              <p className="text-xs text-gray-600 mt-0.5">Configure your settings below</p>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-lg font-bold mb-4">{isConfigured ? 'Edit' : 'Setup'} Lending Settings</h2>
+      <div className="bg-gradient-to-br from-white to-gray-50 p-5 rounded-xl shadow-lg border border-gray-100">
+        <h2 className="text-base font-bold mb-4 text-gray-800">{isConfigured ? 'Edit' : 'Setup'} Lending Settings</h2>
 
         <div className="space-y-4">
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1.5">Max lending amount</label>
-            <div className="flex items-center border rounded">
-              <input
-                type="text"
-                value={lendingCap}
-                onChange={(e) => setLendingCap(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border-0 outline-none"
-                placeholder="100"
-              />
-              <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">USDC.e</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Min interest rate</label>
-            <div className="flex items-center border rounded" style={{width: '100px'}}>
-              <input
-                type="text"
-                value={minLendIR}
-                onChange={(e) => setMinLendIR(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
-                placeholder="5"
-              />
-              <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t pt-4">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold">Relaying</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Autoborrow to autolend and satisfy lending paths (optional)</p>
-          </div>
-
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1.5">Max borrow</label>
-              <div className="flex items-center border rounded">
-                <input
-                  type="text"
-                  value={borrowCap}
-                  onChange={(e) => setBorrowCap(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
-                  placeholder="0"
-                />
-                <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">USDC.e</span>
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-gray-700">Max Lending Amount</label>
+            <div className="flex gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center border-2 border-gray-200 rounded-lg focus-within:border-[#ff6b35] transition-colors bg-white">
+                  <input
+                    type="text"
+                    value={lendingCap}
+                    onChange={(e) => setLendingCap(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 text-sm font-medium border-0 outline-none bg-transparent"
+                    placeholder="100"
+                  />
+                  <span className="px-2 text-xs font-semibold text-gray-500 border-l-2 border-gray-200 whitespace-nowrap">USDC.e</span>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Max interest</label>
-              <div className="flex items-center border rounded" style={{width: '100px'}}>
-                <input
-                  type="text"
-                  value={maxBorrowIR}
-                  onChange={(e) => setMaxBorrowIR(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
-                  placeholder="10"
-                />
-                <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">%</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Min margin</label>
-              <div className="flex items-center border rounded" style={{width: '100px'}}>
-                <input
-                  type="text"
-                  value={minIRMargin}
-                  onChange={(e) => setMinIRMargin(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
-                  placeholder="1"
-                />
-                <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">%</span>
+              <div className="w-24">
+                <div className="flex items-center border-2 border-gray-200 rounded-lg focus-within:border-green-500 transition-colors bg-white">
+                  <input
+                    type="text"
+                    value={minLendIR}
+                    onChange={(e) => setMinLendIR(e.target.value)}
+                    className="flex-1 px-2 py-2 text-sm font-medium border-0 outline-none bg-transparent text-center"
+                    placeholder="5.00"
+                  />
+                  <span className="px-2 text-xs font-semibold text-gray-500 border-l-2 border-gray-200">%</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 text-center">Min IR</p>
               </div>
             </div>
           </div>
-        </div>
 
-        <button
-          onClick={handleSave}
-          disabled={isPending || isConfirming}
-          className="w-full bg-[#ff6b35] text-white px-4 py-2 rounded-lg font-semibold hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-        >
-          {isPending || isConfirming ? 'Saving...' : (isConfigured ? 'Update Settings' : 'Save Settings')}
-        </button>
+          <div className="border-t-2 border-gray-200 pt-4">
+            <div className="mb-3">
+              <h3 className="text-xs font-semibold text-gray-700">Relaying</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Autoborrow to autolend (optional)</p>
+            </div>
 
-        {hash && (
-          <div className="text-sm text-gray-600 text-center">
-            Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
-            {isConfirming && ' (confirming...)'}
-            {isSuccess && ' ✓'}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-700">Max Borrow Amount</label>
+              <div className="flex gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center border-2 border-gray-200 rounded-lg focus-within:border-blue-500 transition-colors bg-white">
+                    <input
+                      type="text"
+                      value={borrowCap}
+                      onChange={(e) => setBorrowCap(e.target.value)}
+                      className="flex-1 min-w-0 px-3 py-2 text-sm font-medium border-0 outline-none bg-transparent"
+                      placeholder="0"
+                    />
+                    <span className="px-2 text-xs font-semibold text-gray-500 border-l-2 border-gray-200 whitespace-nowrap">USDC.e</span>
+                  </div>
+                </div>
+                <div className="w-20">
+                  <div className="flex items-center border-2 border-gray-200 rounded-lg focus-within:border-orange-500 transition-colors bg-white">
+                    <input
+                      type="text"
+                      value={maxBorrowIR}
+                      onChange={(e) => setMaxBorrowIR(e.target.value)}
+                      className="flex-1 px-1.5 py-2 text-sm font-medium border-0 outline-none bg-transparent text-center"
+                      placeholder="10"
+                    />
+                    <span className="px-1.5 text-xs font-semibold text-gray-500 border-l-2 border-gray-200">%</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 text-center">Max IR</p>
+                </div>
+                <div className="w-20">
+                  <div className="flex items-center border-2 border-gray-200 rounded-lg focus-within:border-green-500 transition-colors bg-white">
+                    <input
+                      type="text"
+                      value={minIRMargin}
+                      onChange={(e) => setMinIRMargin(e.target.value)}
+                      className="flex-1 px-1.5 py-2 text-sm font-medium border-0 outline-none bg-transparent text-center"
+                      placeholder="1"
+                    />
+                    <span className="px-1.5 text-xs font-semibold text-gray-500 border-l-2 border-gray-200">%</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 text-center">Margin</p>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+
+          <button
+            onClick={handleSave}
+            disabled={isPending || isConfirming}
+            className="w-full bg-gradient-to-r from-[#ff6b35] to-[#ff5722] text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-md"
+          >
+            {isPending || isConfirming ? 'Saving...' : (isConfigured ? 'Update Settings' : 'Save Settings')}
+          </button>
+
+          {hash && (
+            <div className="text-xs text-center text-gray-600 font-mono mt-2">
+              Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+              {isConfirming && ' (confirming...)'}
+              {isSuccess && ' ✓'}
+            </div>
+          )}
         </div>
       </div>
     </>
