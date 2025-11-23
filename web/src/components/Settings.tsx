@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { formatEther, parseEther } from 'viem'
-
-const MODULE_ADDRESS = '0x0eE3B1A0544e1EA6b23fF1adb2b35Df5278B3914'
+import { MODULE_ADDRESS } from '../config/constants'
 
 const MODULE_ABI = [{
   name: 'limits',

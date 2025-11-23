@@ -5,8 +5,10 @@ import { injected } from 'wagmi/connectors'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HelpButton, HelpModal } from './components/HelpModal'
 import { Settings } from './components/Settings'
+import { TrustNetwork } from './components/TrustNetwork'
 import { Sdk } from '@aboutcircles/sdk'
 import { circlesConfig } from '@aboutcircles/sdk-core'
+import { MODULE_ADDRESS, SAFE_ABI } from './config/constants'
 
 const wagmiConfig = createConfig({
   chains: [gnosis],
@@ -17,22 +19,6 @@ const wagmiConfig = createConfig({
 })
 
 const queryClient = new QueryClient()
-
-const MODULE_ADDRESS = '0x0eE3B1A0544e1EA6b23fF1adb2b35Df5278B3914'
-
-const SAFE_ABI = [{
-  name: 'isModuleEnabled',
-  type: 'function',
-  stateMutability: 'view',
-  inputs: [{ name: 'module', type: 'address' }],
-  outputs: [{ name: '', type: 'bool' }],
-}, {
-  name: 'enableModule',
-  type: 'function',
-  stateMutability: 'nonpayable',
-  inputs: [{ name: 'module', type: 'address' }],
-  outputs: [],
-}] as const
 
 function EnableModule() {
   const { address, isConnected } = useAccount()
@@ -280,6 +266,7 @@ function App() {
             <div className="space-y-6">
               <EnableModule />
               <Settings />
+              <TrustNetwork />
             </div>
           </div>
         </div>
