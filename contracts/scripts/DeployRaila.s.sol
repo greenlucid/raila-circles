@@ -9,8 +9,8 @@ contract DeployRaila is Script {
         vm.startBroadcast();
 
         new RailaModule(
-            // wxdai
-            IERC20(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d),
+            // USDC.e
+            IERC20(0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0),
             ICirclesHub(0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8)
         );
 
