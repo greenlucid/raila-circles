@@ -253,22 +253,34 @@ function OrderbookView({ tiers }: { tiers: LiquidityTier[]; borrowerAddress: str
       </div>
 
       {/* Borrow input panel - 40% */}
-      <div className="flex-[2] border-2 border-gray-200 rounded-lg p-4">
+      <div className="flex-[2] border-2 border-gray-200 rounded-lg p-4 relative">
+        <div className="absolute inset-0 bg-gray-50 bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+          <div className="text-center px-4">
+            <div className="bg-yellow-100 border-2 border-yellow-300 rounded-lg p-4 shadow-lg">
+              <p className="text-sm font-bold text-yellow-800 mb-1">🚧 WIP</p>
+              <p className="text-xs text-yellow-700">
+                Please use <span className="font-semibold">Detailed</span> view to choose a specific path!
+              </p>
+            </div>
+          </div>
+        </div>
+
         <label className="block text-xs text-gray-600 mb-2 font-semibold">Amount to borrow</label>
 
-        <div className="flex items-center border-2 rounded-lg focus-within:border-[#ff6b35] transition-colors mb-3">
+        <div className="flex items-center border-2 rounded-lg focus-within:border-[#ff6b35] transition-colors mb-3 opacity-50">
           <input
             type="text"
             value={borrowAmount}
             onChange={(e) => setBorrowAmount(e.target.value)}
             className="flex-1 px-3 py-2 text-sm border-0 outline-none"
             placeholder="0.00"
+            disabled
           />
           <span className="px-3 text-xs text-gray-500 border-l-2 bg-gray-50 font-semibold">USDC.e</span>
         </div>
 
         {borrowAmountBigInt > 0n && (
-          <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
+          <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200 opacity-50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-600">Avg APR</span>
               <span className="text-sm font-bold text-gray-700">{avgAPR.toFixed(2)}%</span>
@@ -282,20 +294,20 @@ function OrderbookView({ tiers }: { tiers: LiquidityTier[]; borrowerAddress: str
 
         <button
           onClick={handleBorrow}
-          disabled={isPending || isConfirming || !borrowAmount || remainingAmount > 0n}
+          disabled
           className="w-full bg-[#ff6b35] text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
         >
           {isPending || isConfirming ? 'Borrowing...' : 'Borrow'}
         </button>
 
         {remainingAmount > 0n && borrowAmountBigInt > 0n && (
-          <p className="text-xs text-red-600 mt-2">
+          <p className="text-xs text-red-600 mt-2 opacity-50">
             Not enough liquidity (short {formatUnits(remainingAmount, 6)} USDC.e)
           </p>
         )}
 
         {hash && (
-          <div className="text-xs text-gray-600 mt-2 font-mono">
+          <div className="text-xs text-gray-600 mt-2 font-mono opacity-50">
             Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
             {isConfirming && ' (confirming...)'}
             {isSuccess && ' ✓'}
