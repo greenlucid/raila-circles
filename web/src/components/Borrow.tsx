@@ -47,6 +47,32 @@ export function Borrow() {
             </p>
           )}
 
+          {/* Show initial skeleton when first loading */}
+          {isLoading && paths.length === 0 && (
+            <div className="border-2 border-gray-200 rounded-lg p-4 animate-pulse">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-20"></div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+              <div className="pt-3 border-t">
+                <div className="h-3 bg-gray-200 rounded w-24 mb-2"></div>
+                <div className="flex gap-2">
+                  <div className="flex-1 h-10 bg-gray-200 rounded"></div>
+                  <div className="w-24 h-10 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Show paths as they're discovered */}
           {paths.length > 0 && (
             <>
@@ -62,8 +88,8 @@ export function Borrow() {
             </>
           )}
 
-          {/* Loading indicator at the bottom */}
-          {isLoading && (
+          {/* Loading indicator at the bottom (when we already have paths) */}
+          {isLoading && paths.length > 0 && (
             <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
               <div className="animate-spin h-3 w-3 border-2 border-[#ff6b35] border-t-transparent rounded-full"></div>
               <span>

@@ -75,7 +75,26 @@ export function Debts() {
           <h3 className="text-lg font-semibold mb-3">Repay Your Loans</h3>
 
           {isLoading ? (
-            <p className="text-sm text-gray-500">Finding repay paths...</p>
+            <div className="space-y-3">
+              {/* Loading skeleton */}
+              <div className="border-2 border-gray-200 rounded-lg p-4 animate-pulse">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-24"></div>
+                  </div>
+                </div>
+                <div className="pt-3 border-t">
+                  <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 h-10 bg-gray-200 rounded"></div>
+                    <div className="w-24 h-10 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 text-center">Finding repay paths...</p>
+            </div>
           ) : repayPaths && repayPaths.length > 0 ? (
             <div className="space-y-3">
               {repayPaths.map((path, idx) => (
