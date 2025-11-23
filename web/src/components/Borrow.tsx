@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { formatUnits, parseUnits } from 'viem'
 import { useLendingPaths } from '../hooks/useLendingPaths'
-import type { EnrichedLendingPath } from '../hooks/useLendingPaths'
+import type { LiquidityTier, EnrichedLendingPath } from '../hooks/useLendingPaths'
 import { MODULE_ADDRESS } from '../config/constants'
 
 const MODULE_ABI = [{
@@ -17,23 +17,45 @@ const MODULE_ABI = [{
   outputs: [],
 }] as const
 
-const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
-
-function formatIR(ir: bigint): string {
-  const aprPercent = Number(ir) / 1e18 * SECONDS_PER_YEAR * 100
-  return aprPercent.toFixed(2)
-}
-
 export function Borrow() {
   const { address } = useAccount()
+  const [viewMode, setViewMode] = useState<'orderbook' | 'detailed'>('orderbook')
 
-  const { data: paths, isLoading, error, currentDepth } = useLendingPaths(address)
+  const { data: tiers, isLoading, error, currentDepth } = useLendingPaths(address)
 
   if (!address) return null
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-bold mb-4">Pathfinding Borrow</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Borrow Liquidity</h2>
+
+        {/* View toggle */}
+        {tiers.length > 0 && (
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('orderbook')}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                viewMode === 'orderbook'
+                  ? 'bg-white text-[#ff6b35] shadow'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Orderbook
+            </button>
+            <button
+              onClick={() => setViewMode('detailed')}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                viewMode === 'detailed'
+                  ? 'bg-white text-[#ff6b35] shadow'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Detailed
+            </button>
+          </div>
+        )}
+      </div>
 
       {error && (
         <p className="text-red-600">Error: {error.message}</p>
@@ -41,14 +63,14 @@ export function Borrow() {
 
       {!error && (
         <>
-          {!isLoading && paths.length === 0 && (
+          {!isLoading && tiers.length === 0 && (
             <p className="text-gray-500">
               No lending paths found. Try expanding your trust network or ask trusted contacts to enable the Raila module.
             </p>
           )}
 
           {/* Show initial skeleton when first loading */}
-          {isLoading && paths.length === 0 && (
+          {isLoading && tiers.length === 0 && (
             <div className="border-2 border-gray-200 rounded-lg p-4 animate-pulse">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -73,23 +95,29 @@ export function Borrow() {
             </div>
           )}
 
-          {/* Show paths as they're discovered */}
-          {paths.length > 0 && (
+          {/* Show tiers as they're discovered */}
+          {tiers.length > 0 && (
             <>
-              <p className="text-sm text-gray-600 mb-4">
-                Found {paths.length} lending path{paths.length !== 1 ? 's' : ''}
-              </p>
+              {viewMode === 'orderbook' ? (
+                <OrderbookView tiers={tiers} borrowerAddress={address} />
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Liquidity available at {tiers.length} rate tier{tiers.length !== 1 ? 's' : ''}
+                  </p>
 
-              <div className="space-y-4">
-                {paths.map((path, idx) => (
-                  <PathCard key={idx} path={path} borrowerAddress={address} />
-                ))}
-              </div>
+                  <div className="space-y-3">
+                    {tiers.map((tier, idx) => (
+                      <TierCard key={idx} tier={tier} borrowerAddress={address} />
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
 
-          {/* Loading indicator at the bottom (when we already have paths) */}
-          {isLoading && paths.length > 0 && (
+          {/* Loading indicator at the bottom (when we already have tiers) */}
+          {isLoading && tiers.length > 0 && (
             <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
               <div className="animate-spin h-3 w-3 border-2 border-[#ff6b35] border-t-transparent rounded-full"></div>
               <span>
@@ -100,13 +128,215 @@ export function Borrow() {
             </div>
           )}
 
-          {!isLoading && paths.length > 0 && (
+          {!isLoading && tiers.length > 0 && (
             <p className="text-xs text-gray-500 mt-4 text-center">
-              No more paths found
+              No more liquidity found
             </p>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
+
+function formatIR(ir: bigint): string {
+  const aprPercent = Number(ir) / 1e18 * SECONDS_PER_YEAR * 100
+  return aprPercent.toFixed(2)
+}
+
+function OrderbookView({ tiers }: { tiers: LiquidityTier[]; borrowerAddress: string }) {
+  const [borrowAmount, setBorrowAmount] = useState('')
+
+  const { writeContract, data: hash, isPending } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+
+  // Calculate max liquidity for bar sizing
+  const maxLiquidity = tiers.length > 0
+    ? Math.max(...tiers.map(t => Number(formatUnits(t.totalAvailable, 6))))
+    : 0
+
+  // Calculate weighted average APR and max APR for the borrow amount
+  const borrowAmountBigInt = borrowAmount ? parseUnits(borrowAmount, 6) : 0n
+  let remainingAmount = borrowAmountBigInt
+  let weightedSum = 0
+  let maxAPR = 0
+  const selectedTiers: Array<{ tier: LiquidityTier; amount: bigint }> = []
+
+  for (const tier of tiers) {
+    if (remainingAmount === 0n) break
+
+    const tierAmount = tier.totalAvailable > remainingAmount ? remainingAmount : tier.totalAvailable
+    selectedTiers.push({ tier, amount: tierAmount })
+
+    weightedSum += Number(tierAmount) * tier.interestRateAPR
+    maxAPR = tier.interestRateAPR
+    remainingAmount -= tierAmount
+  }
+
+  const avgAPR = borrowAmountBigInt > 0n
+    ? weightedSum / Number(borrowAmountBigInt)
+    : 0
+
+  const handleBorrow = () => {
+    if (!borrowAmount || selectedTiers.length === 0) return
+
+    try {
+      const amountInTokens = parseUnits(borrowAmount, 6)
+
+      // Use first path from first tier that has enough liquidity
+      // TODO: Smart path selection across multiple tiers
+      const firstTier = selectedTiers[0].tier
+      const selectedPath = firstTier.paths.find(path => path.sourceUSDC >= amountInTokens)
+
+      if (!selectedPath) {
+        alert('Not enough liquidity in a single path for this amount')
+        return
+      }
+
+      writeContract({
+        address: MODULE_ADDRESS as `0x${string}`,
+        abi: MODULE_ABI,
+        functionName: 'borrow',
+        args: [
+          amountInTokens,
+          selectedPath.path as `0x${string}`[],
+          selectedPath.irs,
+        ],
+      })
+    } catch (err) {
+      console.error('Failed to borrow:', err)
+      alert('Invalid borrow amount')
+    }
+  }
+
+  return (
+    <div className="flex gap-4">
+      {/* Orderbook depth chart - 60% */}
+      <div className="flex-[3]">
+        <div className="space-y-1">
+          {tiers.map((tier, idx) => {
+            const amount = parseFloat(formatUnits(tier.totalAvailable, 6))
+            const percentage = (amount / maxLiquidity) * 100
+
+            return (
+              <div
+                key={idx}
+                className="relative flex items-center justify-between py-2 px-3 rounded hover:bg-gray-50 transition-colors group"
+              >
+                {/* Background bar */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-100 to-orange-50 rounded transition-all"
+                  style={{ width: `${percentage}%` }}
+                />
+
+                {/* Content */}
+                <div className="relative z-10 flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-mono font-semibold text-gray-700">
+                      {amount.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {tier.lenderCount} source{tier.lenderCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <span className="text-sm font-bold text-[#ff6b35]">
+                    {tier.interestRateAPR.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Borrow input panel - 40% */}
+      <div className="flex-[2] border-2 border-gray-200 rounded-lg p-4">
+        <label className="block text-xs text-gray-600 mb-2 font-semibold">Amount to borrow</label>
+
+        <div className="flex items-center border-2 rounded-lg focus-within:border-[#ff6b35] transition-colors mb-3">
+          <input
+            type="text"
+            value={borrowAmount}
+            onChange={(e) => setBorrowAmount(e.target.value)}
+            className="flex-1 px-3 py-2 text-sm border-0 outline-none"
+            placeholder="0.00"
+          />
+          <span className="px-3 text-xs text-gray-500 border-l-2 bg-gray-50 font-semibold">USDC.e</span>
+        </div>
+
+        {borrowAmountBigInt > 0n && (
+          <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-600">Avg APR</span>
+              <span className="text-sm font-bold text-gray-700">{avgAPR.toFixed(2)}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-600">Max APR</span>
+              <span className="text-sm font-bold text-[#ff6b35]">{maxAPR.toFixed(2)}%</span>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={handleBorrow}
+          disabled={isPending || isConfirming || !borrowAmount || remainingAmount > 0n}
+          className="w-full bg-[#ff6b35] text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+        >
+          {isPending || isConfirming ? 'Borrowing...' : 'Borrow'}
+        </button>
+
+        {remainingAmount > 0n && borrowAmountBigInt > 0n && (
+          <p className="text-xs text-red-600 mt-2">
+            Not enough liquidity (short {formatUnits(remainingAmount, 6)} USDC.e)
+          </p>
+        )}
+
+        {hash && (
+          <div className="text-xs text-gray-600 mt-2 font-mono">
+            Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+            {isConfirming && ' (confirming...)'}
+            {isSuccess && ' ✓'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TierCard({ tier, borrowerAddress }: { tier: LiquidityTier; borrowerAddress: string }) {
+  const totalAvailableFormatted = parseFloat(formatUnits(tier.totalAvailable, 6)).toFixed(2)
+
+  // Sort paths by liquidity (highest first) for display
+  const sortedPaths = [...tier.paths].sort((a, b) => Number(b.sourceUSDC - a.sourceUSDC))
+
+  return (
+    <div className="border-2 border-gray-200 rounded-lg p-4 hover:border-[#ff6b35] transition-colors">
+      {/* Individual path cards */}
+      <div className="space-y-3 mb-3 max-w-2xl">
+        {sortedPaths.map((path, idx) => (
+          <PathCard key={idx} path={path} borrowerAddress={borrowerAddress} />
+        ))}
+      </div>
+
+      {/* Aggregated tier summary */}
+      <div className="pt-3 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Total at {tier.interestRateAPR.toFixed(2)}% APR</p>
+            <p className="text-sm font-semibold text-gray-700">
+              {tier.lenderCount} source{tier.lenderCount !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold text-green-600">
+              {totalAvailableFormatted} USDC.e
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

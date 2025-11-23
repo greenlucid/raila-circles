@@ -5,7 +5,8 @@ import { Sdk } from '@aboutcircles/sdk'
 import { circlesConfig } from '@aboutcircles/sdk-core'
 
 export interface EnrichedLendingPath extends LendingPath {
-  // Add profile metadata
+  sourceName?: string
+  sourceImage?: string
   profiles: {
     address: string
     name?: string
@@ -13,11 +14,19 @@ export interface EnrichedLendingPath extends LendingPath {
   }[]
 }
 
+export interface LiquidityTier {
+  interestRate: bigint // The IR you'd pay (per second)
+  interestRateAPR: number // APR %
+  totalAvailable: bigint // Total USDC.e available at this rate
+  lenderCount: number // How many unique sources
+  paths: EnrichedLendingPath[] // Underlying paths with profile data (for executing borrow & display)
+}
+
 /**
- * Hook to find and enrich lending paths with profile metadata, streaming results as they're found
+ * Hook to aggregate lending paths by interest rate (order book style), streaming as discovered
  */
 export function useLendingPaths(borrowerAddress: string | undefined, enabled: boolean = true) {
-  const [paths, setPaths] = useState<EnrichedLendingPath[]>([])
+  const [tiers, setTiers] = useState<LiquidityTier[]>([])
   const [currentDepth, setCurrentDepth] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -27,11 +36,11 @@ export function useLendingPaths(borrowerAddress: string | undefined, enabled: bo
   useEffect(() => {
     if (!borrowerAddress || !enabled) return
 
+    const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
     const sdk = new Sdk(circlesConfig[100])
     const profileCache = new Map<string, { name?: string; image?: string }>()
 
     async function enrichPath(path: LendingPath): Promise<EnrichedLendingPath> {
-      // Fetch profiles for addresses we don't have cached
       const profilePromises = path.path.map(async (addr) => {
         if (profileCache.has(addr)) {
           return { address: addr, ...profileCache.get(addr)! }
@@ -72,9 +81,12 @@ export function useLendingPaths(borrowerAddress: string | undefined, enabled: bo
     async function loadPaths() {
       setIsLoading(true)
       setError(null)
-      setPaths([])
+      setTiers([])
       setCurrentDepth(null)
       seenPaths.current.clear()
+
+      // Map from IR (as string) to aggregated data
+      const tierMap = new Map<string, LiquidityTier>()
 
       try {
         await findLendingPathsStreaming(
@@ -89,18 +101,55 @@ export function useLendingPaths(borrowerAddress: string | undefined, enabled: bo
             }
             seenPaths.current.add(pathKey)
 
-            // Add path immediately without enrichment, enrich in background
+            // Get the final IR (what you pay as borrower)
+            const finalIR = path.irs[path.irs.length - 1]
+            const irKey = finalIR.toString()
+
+            // Add unenriched first for instant display
             const unenriched: EnrichedLendingPath = {
               ...path,
               profiles: path.path.map(addr => ({ address: addr, name: undefined, image: undefined }))
             }
-            setPaths(prev => [...prev, unenriched])
 
-            // Enrich in background (don't await!)
+            if (tierMap.has(irKey)) {
+              // Add to existing tier
+              const tier = tierMap.get(irKey)!
+              tier.totalAvailable += path.sourceUSDC
+              tier.lenderCount += 1
+              tier.paths.push(unenriched)
+            } else {
+              // Create new tier
+              const aprPercent = Number(finalIR) / 1e18 * SECONDS_PER_YEAR * 100
+              tierMap.set(irKey, {
+                interestRate: finalIR,
+                interestRateAPR: aprPercent,
+                totalAvailable: path.sourceUSDC,
+                lenderCount: 1,
+                paths: [unenriched],
+              })
+            }
+
+            // Convert map to sorted array (lowest rate first)
+            const sortedTiers = Array.from(tierMap.values()).sort((a, b) =>
+              Number(a.interestRate - b.interestRate)
+            )
+
+            setTiers(sortedTiers)
+
+            // Enrich in background
             enrichPath(path).then(enriched => {
-              setPaths(prev => prev.map(p =>
-                p.path.join('-') === pathKey ? enriched : p
-              ))
+              const tier = tierMap.get(irKey)
+              if (tier) {
+                const pathIndex = tier.paths.findIndex(p => p.path.join('-') === pathKey)
+                if (pathIndex !== -1) {
+                  tier.paths[pathIndex] = enriched
+                  // Re-sort and update
+                  const updatedTiers = Array.from(tierMap.values()).sort((a, b) =>
+                    Number(a.interestRate - b.interestRate)
+                  )
+                  setTiers(updatedTiers)
+                }
+              }
             })
           },
           (depth) => {
@@ -118,5 +167,5 @@ export function useLendingPaths(borrowerAddress: string | undefined, enabled: bo
     loadPaths()
   }, [borrowerAddress, enabled])
 
-  return { data: paths, isLoading, error, currentDepth }
+  return { data: tiers, isLoading, error, currentDepth }
 }

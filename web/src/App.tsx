@@ -79,7 +79,7 @@ function LenderPanel() {
   if (!isConnected) return null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-md">
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex items-start gap-3 mb-4">
           <div className="bg-[#ff6b35] bg-opacity-10 p-3 rounded-lg">
@@ -132,9 +132,11 @@ function Dashboard() {
   if (!isConnected) return null
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="flex flex-col lg:flex-row gap-8 max-w-6xl mx-auto">
       <LenderPanel />
-      <BorrowerPanel />
+      <div className="flex-1 max-w-2xl">
+        <BorrowerPanel />
+      </div>
     </div>
   )
 }
@@ -343,7 +345,7 @@ function App() {
           />
 
           <div>
-            <div className="flex justify-between items-center px-4 py-3">
+            <div className="flex justify-between items-center px-4 py-3 max-w-6xl mx-auto">
               <h1 className="text-2xl font-bold">Raila Circles</h1>
               <div className="flex items-center gap-3">
                 <HelpButton onClick={() => setShowHelp(true)} />
