@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi'
+import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnect, useSwitchChain, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { gnosis } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -16,6 +16,95 @@ const wagmiConfig = createConfig({
 })
 
 const queryClient = new QueryClient()
+
+const MODULE_ADDRESS = '0x0eE3B1A0544e1EA6b23fF1adb2b35Df5278B3914'
+
+const SAFE_ABI = [{
+  name: 'isModuleEnabled',
+  type: 'function',
+  stateMutability: 'view',
+  inputs: [{ name: 'module', type: 'address' }],
+  outputs: [{ name: '', type: 'bool' }],
+}, {
+  name: 'enableModule',
+  type: 'function',
+  stateMutability: 'nonpayable',
+  inputs: [{ name: 'module', type: 'address' }],
+  outputs: [],
+}] as const
+
+function EnableModule() {
+  const { address, isConnected } = useAccount()
+
+  const { data: moduleEnabled, refetch } = useReadContract({
+    address: address,
+    abi: SAFE_ABI,
+    functionName: 'isModuleEnabled',
+    args: [MODULE_ADDRESS as `0x${string}`],
+    query: {
+      enabled: !!address && isConnected,
+    },
+  })
+
+  const { writeContract, data: hash, isPending } = useWriteContract()
+
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+  useEffect(() => {
+    if (isSuccess) {
+      refetch()
+    }
+  }, [isSuccess, refetch])
+
+  const handleEnableModule = () => {
+    if (!address) return
+
+    writeContract({
+      address: address,
+      abi: SAFE_ABI,
+      functionName: 'enableModule',
+      args: [MODULE_ADDRESS as `0x${string}`],
+    })
+  }
+
+  if (!isConnected) return null
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <h2 className="text-xl font-bold mb-4">Raila Module</h2>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          {moduleEnabled ? (
+            <div className="text-green-600 font-semibold">✓ Module Enabled</div>
+          ) : (
+            <>
+              <div className="text-gray-600">Module not enabled</div>
+              <button
+                onClick={handleEnableModule}
+                disabled={isPending || isConfirming}
+                className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPending || isConfirming ? 'Enabling...' : 'Enable Module'}
+              </button>
+            </>
+          )}
+        </div>
+        {hash && (
+          <div className="text-sm text-gray-600">
+            Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+            {isConfirming && ' (confirming...)'}
+            {isSuccess && ' ✓'}
+          </div>
+        )}
+      </div>
+      <div className="text-xs text-gray-500 mt-2">
+        Module: {MODULE_ADDRESS}
+      </div>
+    </div>
+  )
+}
 
 function CirclesInfo({ address }: { address: string }) {
   const [avatarInfo, setAvatarInfo] = useState<any>(null)
@@ -190,6 +279,8 @@ function App() {
             <div className="flex justify-center mb-8">
               <ConnectButton />
             </div>
+
+            <EnableModule />
           </div>
         </div>
       </QueryClientProvider>
