@@ -5,7 +5,7 @@ import { gnosis } from 'wagmi/chains'
 import { MODULE_ADDRESS, SAFE_ABI, USDC_ADDRESS, ERC20_ABI } from '../config/constants'
 
 // Max hops in the lending path (configurable)
-export const MAX_PATH_DEPTH = 2
+export const MAX_PATH_DEPTH = 5
 
 export interface UserSettings {
   address: string
