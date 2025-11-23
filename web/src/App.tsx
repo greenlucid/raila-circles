@@ -8,7 +8,8 @@ import { Settings } from './components/Settings'
 import { TrustNetwork } from './components/TrustNetwork'
 import { Sdk } from '@aboutcircles/sdk'
 import { circlesConfig } from '@aboutcircles/sdk-core'
-import { MODULE_ADDRESS, SAFE_ABI } from './config/constants'
+import { formatUnits } from 'viem'
+import { MODULE_ADDRESS, SAFE_ABI, USDC_ADDRESS, ERC20_ABI } from './config/constants'
 
 const wagmiConfig = createConfig({
   chains: [gnosis],
@@ -56,9 +57,6 @@ function EnableModule() {
           {isSuccess && ' ✓'}
         </div>
       )}
-      <div className="text-xs text-gray-500">
-        Module: {MODULE_ADDRESS}
-      </div>
     </div>
   )
 }
@@ -81,15 +79,29 @@ function LenderPanel() {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-2">Become a Lender or Relayer</h2>
-        <p className="text-sm text-gray-600 mb-6">
-          Enable the Raila module to lend to your trusted circle or act as a loan relayer
-        </p>
+        <div className="flex items-start gap-3 mb-4">
+          <div className="bg-[#ff6b35] bg-opacity-10 p-3 rounded-lg">
+            <svg className="w-6 h-6 text-[#ff6b35]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold mb-1">Become a Lender or Relayer</h2>
+            <p className="text-sm text-gray-600">
+              Enable the Raila module to lend to your trusted circle or act as a loan relayer
+            </p>
+          </div>
+        </div>
 
         {!moduleEnabled ? (
           <EnableModule />
         ) : (
-          <div className="text-green-600 font-semibold mb-4">✓ Module Enabled</div>
+          <div className="flex items-center gap-2 text-green-600 font-semibold">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Module Enabled
+          </div>
         )}
       </div>
 
@@ -106,10 +118,19 @@ function BorrowerPanel() {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-2">Borrow from your Circle</h2>
-        <p className="text-sm text-gray-600 mb-6">
-          See who you can borrow from in your trust network
-        </p>
+        <div className="flex items-start gap-3 mb-4">
+          <div className="bg-blue-500 bg-opacity-10 p-3 rounded-lg">
+            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold mb-1">Borrow from your Circle</h2>
+            <p className="text-sm text-gray-600">
+              See who you can borrow from in your trust network
+            </p>
+          </div>
+        </div>
 
         {/* TODO: Add borrowing UI - show available liquidity, borrow amounts, etc */}
         <div className="text-gray-500 text-sm">Borrowing interface coming soon...</div>
@@ -224,6 +245,16 @@ function ConnectButton() {
   const { switchChain } = useSwitchChain()
   const [copied, setCopied] = useState(false)
 
+  const { data: usdcBalance } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && isConnected,
+    },
+  })
+
   const handleCopy = () => {
     if (address) {
       navigator.clipboard.writeText(address)
@@ -244,30 +275,41 @@ function ConnectButton() {
   }
 
   const isWrongChain = chain?.id !== gnosis.id
+  const formattedBalance = usdcBalance ? formatUnits(usdcBalance, 6) : '0'
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-md relative">
-      {!isWrongChain && address && <CirclesInfo address={address} />}
+    <div className="p-3 bg-white rounded-lg shadow-md relative min-w-[280px]">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          {!isWrongChain && address && <CirclesInfo address={address} />}
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1">
+            <a
+              href={`https://app.safe.global/home?safe=gno:${address}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-xs text-gray-600 hover:text-gray-800"
+            >
+              {address?.slice(0, 6)}...{address?.slice(-4)}
+            </a>
+            <button
+              onClick={handleCopy}
+              className="text-gray-500 hover:text-gray-700 p-1"
+              title="Copy address"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <a
-            href={`https://app.safe.global/home?safe=gno:${address}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-xs text-gray-600 hover:text-gray-800"
-          >
-            {address?.slice(0, 6)}...{address?.slice(-4)}
-          </a>
-          <button
-            onClick={handleCopy}
-            className="text-gray-500 hover:text-gray-700 p-1"
-            title="Copy address"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
+          <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg" alt="USDC" className="w-3 h-3" />
+          <span className="text-xs font-semibold">{parseFloat(formattedBalance).toFixed(2)} USDC.e</span>
         </div>
         {isWrongChain ? (
           <button

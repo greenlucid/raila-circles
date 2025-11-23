@@ -1,5 +1,15 @@
 export const MODULE_ADDRESS = '0xB877459e28ae22B6CE214a3af7b3dcEC96fB8ca4'
 
+export const USDC_ADDRESS = '0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0' // USDC.e on Gnosis
+
+export const ERC20_ABI = [{
+  name: 'balanceOf',
+  type: 'function',
+  stateMutability: 'view',
+  inputs: [{ name: 'account', type: 'address' }],
+  outputs: [{ name: '', type: 'uint256' }],
+}] as const
+
 export const SAFE_ABI = [{
   name: 'isModuleEnabled',
   type: 'function',
