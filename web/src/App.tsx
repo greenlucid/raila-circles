@@ -7,6 +7,7 @@ import { HelpButton, HelpModal } from './components/HelpModal'
 import { Settings } from './components/Settings'
 // import { TrustNetwork } from './components/TrustNetwork'
 import { Borrow } from './components/Borrow'
+import { Debts } from './components/Debts'
 import { Sdk } from '@aboutcircles/sdk'
 import { circlesConfig } from '@aboutcircles/sdk-core'
 import { formatUnits } from 'viem'
@@ -118,6 +119,7 @@ function BorrowerPanel() {
 
   return (
     <div className="space-y-6">
+      <Debts />
       <Borrow />
       {/* <TrustNetwork /> */}
     </div>
