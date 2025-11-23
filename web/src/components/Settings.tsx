@@ -52,15 +52,18 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
   const [maxBorrowIR, setMaxBorrowIR] = useState('')
   const [minIRMargin, setMinIRMargin] = useState('')
 
+  const isConfigured = limits && (limits[0] > 0n || limits[1] > 0n || limits[2] > 0n)
+
   useEffect(() => {
-    if (limits) {
+    if (limits && isConfigured) {
+      const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
       setLendingCap(formatEther(limits[0]))
-      setMinLendIR((Number(limits[1]) / 1e18 * 100).toFixed(2))
+      setMinLendIR((Number(limits[1]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2))
       setBorrowCap(formatEther(limits[2]))
-      setMaxBorrowIR((Number(limits[3]) / 1e18 * 100).toFixed(2))
-      setMinIRMargin((Number(limits[4]) / 1e18 * 100).toFixed(2))
+      setMaxBorrowIR((Number(limits[3]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2))
+      setMinIRMargin((Number(limits[4]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2))
     }
-  }, [limits])
+  }, [limits, isConfigured])
 
   const { writeContract, data: hash, isPending } = useWriteContract()
 
@@ -78,12 +81,13 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
     if (!address) return
 
     try {
+      const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
       const settings = {
         lendingCap: parseEther(lendingCap || '0'),
-        minLendIR: BigInt(Math.floor(parseFloat(minLendIR || '0') * 1e18 / 100)),
+        minLendIR: BigInt(Math.floor(parseFloat(minLendIR || '0') / 100 / SECONDS_PER_YEAR * 1e18)),
         borrowCap: parseEther(borrowCap || '0'),
-        maxBorrowIR: BigInt(Math.floor(parseFloat(maxBorrowIR || '0') * 1e18 / 100)),
-        minIRMargin: BigInt(Math.floor(parseFloat(minIRMargin || '0') * 1e18 / 100)),
+        maxBorrowIR: BigInt(Math.floor(parseFloat(maxBorrowIR || '0') / 100 / SECONDS_PER_YEAR * 1e18)),
+        minIRMargin: BigInt(Math.floor(parseFloat(minIRMargin || '0') / 100 / SECONDS_PER_YEAR * 1e18)),
       }
 
       writeContract({
@@ -100,79 +104,120 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
 
   if (!address || !moduleEnabled) return null
 
+  const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
+  const currentLendingCap = limits ? formatEther(limits[0]) : '0'
+  const currentMinLendIR = limits ? (Number(limits[1]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2) : '0'
+  const currentBorrowCap = limits ? formatEther(limits[2]) : '0'
+  const currentMaxBorrowIR = limits ? (Number(limits[3]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2) : '0'
+  const currentMinIRMargin = limits ? (Number(limits[4]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2) : '0'
+
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-bold mb-4">Lending Settings</h2>
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Lending Cap (WXDAI)</label>
-          <input
-            type="number"
-            value={lendingCap}
-            onChange={(e) => setLendingCap(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="0"
-            step="0.01"
-          />
-          <p className="text-xs text-gray-500 mt-1">Max amount of WXDAI you're willing to lend</p>
+    <>
+      {isConfigured ? (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <h2 className="text-lg font-bold mb-4">Current Settings</h2>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Max lending:</span>
+              <span className="font-semibold">{parseFloat(currentLendingCap).toFixed(2)} USDC.e @ {currentMinLendIR}%</span>
+            </div>
+            {parseFloat(currentBorrowCap) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Relaying:</span>
+                <span className="font-semibold">{parseFloat(currentBorrowCap).toFixed(2)} USDC.e @ max {currentMaxBorrowIR}% (margin {currentMinIRMargin}%)</span>
+              </div>
+            )}
+          </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Min Lending Interest Rate (%/year)</label>
-          <input
-            type="number"
-            value={minLendIR}
-            onChange={(e) => setMinLendIR(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="0"
-            step="0.01"
-          />
-          <p className="text-xs text-gray-500 mt-1">Minimum interest rate to accept for lending</p>
+      ) : (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <div className="text-sm text-gray-600">
+            You haven't configured your lending settings yet
+          </div>
         </div>
+      )}
 
-        <div className="border-t pt-4 mt-4">
-          <h3 className="font-semibold mb-2">Autoborrow / Relaying</h3>
-          <p className="text-xs text-gray-500 mb-3">Enable this if you want to act as a loan relayer</p>
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-lg font-bold mb-4">{isConfigured ? 'Edit' : 'Setup'} Lending Settings</h2>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Borrow Cap (WXDAI)</label>
+        <div className="space-y-4">
+        <div className="flex gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1.5">Max lending amount</label>
+            <div className="flex items-center border rounded">
               <input
-                type="number"
-                value={borrowCap}
-                onChange={(e) => setBorrowCap(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="0 = disabled"
-                step="0.01"
+                type="text"
+                value={lendingCap}
+                onChange={(e) => setLendingCap(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border-0 outline-none"
+                placeholder="100"
               />
-              <p className="text-xs text-gray-500 mt-1">Max WXDAI you'll autoborrow (0 to disable relaying)</p>
+              <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">USDC.e</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Min interest rate</label>
+            <div className="flex items-center border rounded" style={{width: '100px'}}>
+              <input
+                type="text"
+                value={minLendIR}
+                onChange={(e) => setMinLendIR(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
+                placeholder="5"
+              />
+              <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t pt-4">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold">Relaying</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Autoborrow to autolend and satisfy lending paths (optional)</p>
+          </div>
+
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1.5">Max borrow</label>
+              <div className="flex items-center border rounded">
+                <input
+                  type="text"
+                  value={borrowCap}
+                  onChange={(e) => setBorrowCap(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
+                  placeholder="0"
+                />
+                <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">USDC.e</span>
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Max Borrow Interest Rate (%/year)</label>
-              <input
-                type="number"
-                value={maxBorrowIR}
-                onChange={(e) => setMaxBorrowIR(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="0"
-                step="0.01"
-              />
-              <p className="text-xs text-gray-500 mt-1">Max interest rate you'll pay when autoborr owing</p>
+              <label className="block text-sm font-medium mb-1.5">Max interest</label>
+              <div className="flex items-center border rounded" style={{width: '100px'}}>
+                <input
+                  type="text"
+                  value={maxBorrowIR}
+                  onChange={(e) => setMaxBorrowIR(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
+                  placeholder="10"
+                />
+                <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">%</span>
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Min IR Margin (%/year)</label>
-              <input
-                type="number"
-                value={minIRMargin}
-                onChange={(e) => setMinIRMargin(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="0"
-                step="0.01"
-              />
-              <p className="text-xs text-gray-500 mt-1">Minimum margin between borrow and lend rates when relaying</p>
+              <label className="block text-sm font-medium mb-1.5">Min margin</label>
+              <div className="flex items-center border rounded" style={{width: '100px'}}>
+                <input
+                  type="text"
+                  value={minIRMargin}
+                  onChange={(e) => setMinIRMargin(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border-0 outline-none min-w-0"
+                  placeholder="1"
+                />
+                <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -180,9 +225,9 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
         <button
           onClick={handleSave}
           disabled={isPending || isConfirming}
-          className="w-full bg-[#ff6b35] text-white px-4 py-3 rounded-lg font-semibold hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+          className="w-full bg-[#ff6b35] text-white px-4 py-2 rounded-lg font-semibold hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
         >
-          {isPending || isConfirming ? 'Saving...' : 'Save Settings'}
+          {isPending || isConfirming ? 'Saving...' : (isConfigured ? 'Update Settings' : 'Save Settings')}
         </button>
 
         {hash && (
@@ -192,7 +237,8 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
             {isSuccess && ' ✓'}
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
