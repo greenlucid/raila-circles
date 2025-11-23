@@ -332,6 +332,10 @@ function LenderCard({ lender }: { lender: LenderInfo }) {
     }
   }
 
+  const handleBorrowMax = () => {
+    setBorrowAmount(formatUnits(lender.available, 6))
+  }
+
   const maxBorrow = parseFloat(formatUnits(lender.available, 6)).toFixed(2)
 
   return (
@@ -392,7 +396,15 @@ function LenderCard({ lender }: { lender: LenderInfo }) {
               />
               <span className="px-2 text-xs text-gray-500 border-l bg-gray-50">USDC.e</span>
             </div>
-            <p className="text-xs text-gray-400 mt-1">Max: {maxBorrow} USDC.e</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-xs text-gray-400">Available: {maxBorrow} USDC.e</p>
+              <button
+                onClick={handleBorrowMax}
+                className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+              >
+                Max
+              </button>
+            </div>
           </div>
           <button
             onClick={handleBorrow}
