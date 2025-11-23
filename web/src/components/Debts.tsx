@@ -83,12 +83,10 @@ export function Debts() {
         const sdk = new Sdk(circlesConfig[100])
         const relations = await sdk.data.getTrustRelations(address)
 
-        // Get all mutual trust addresses
-        const trusters = relations
-          .filter((rel: any) => rel.relation === 'mutuallyTrusts')
-          .map((rel: any) =>
-            rel.subjectAvatar === address ? rel.objectAvatar : rel.subjectAvatar
-          )
+        // Get all trust relations (mutual, trustedBy, trusting)
+        const trusters = relations.map((rel: any) =>
+          rel.subjectAvatar === address ? rel.objectAvatar : rel.subjectAvatar
+        )
 
         setCircleAddresses(trusters)
       } catch (err) {
