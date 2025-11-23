@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { formatEther, parseEther } from 'viem'
+import { formatUnits, parseUnits } from 'viem'
 import { MODULE_ADDRESS } from '../config/constants'
 
 const MODULE_ABI = [{
@@ -57,9 +57,9 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
   useEffect(() => {
     if (limits && isConfigured) {
       const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
-      setLendingCap(formatEther(limits[0]))
+      setLendingCap(formatUnits(limits[0], 6))
       setMinLendIR((Number(limits[1]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2))
-      setBorrowCap(formatEther(limits[2]))
+      setBorrowCap(formatUnits(limits[2], 6))
       setMaxBorrowIR((Number(limits[3]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2))
       setMinIRMargin((Number(limits[4]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2))
     }
@@ -83,9 +83,9 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
     try {
       const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
       const settings = {
-        lendingCap: parseEther(lendingCap || '0'),
+        lendingCap: parseUnits(lendingCap || '0', 6),
         minLendIR: BigInt(Math.floor(parseFloat(minLendIR || '0') / 100 / SECONDS_PER_YEAR * 1e18)),
-        borrowCap: parseEther(borrowCap || '0'),
+        borrowCap: parseUnits(borrowCap || '0', 6),
         maxBorrowIR: BigInt(Math.floor(parseFloat(maxBorrowIR || '0') / 100 / SECONDS_PER_YEAR * 1e18)),
         minIRMargin: BigInt(Math.floor(parseFloat(minIRMargin || '0') / 100 / SECONDS_PER_YEAR * 1e18)),
       }
@@ -105,9 +105,9 @@ export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
   if (!address || !moduleEnabled) return null
 
   const SECONDS_PER_YEAR = 365 * 24 * 60 * 60
-  const currentLendingCap = limits ? formatEther(limits[0]) : '0'
+  const currentLendingCap = limits ? formatUnits(limits[0], 6) : '0'
   const currentMinLendIR = limits ? (Number(limits[1]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2) : '0'
-  const currentBorrowCap = limits ? formatEther(limits[2]) : '0'
+  const currentBorrowCap = limits ? formatUnits(limits[2], 6) : '0'
   const currentMaxBorrowIR = limits ? (Number(limits[3]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2) : '0'
   const currentMinIRMargin = limits ? (Number(limits[4]) / 1e18 * SECONDS_PER_YEAR * 100).toFixed(2) : '0'
 

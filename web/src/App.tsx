@@ -5,7 +5,8 @@ import { injected } from 'wagmi/connectors'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HelpButton, HelpModal } from './components/HelpModal'
 import { Settings } from './components/Settings'
-import { TrustNetwork } from './components/TrustNetwork'
+// import { TrustNetwork } from './components/TrustNetwork'
+import { Borrow } from './components/Borrow'
 import { Sdk } from '@aboutcircles/sdk'
 import { circlesConfig } from '@aboutcircles/sdk-core'
 import { formatUnits } from 'viem'
@@ -117,26 +118,8 @@ function BorrowerPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="bg-blue-500 bg-opacity-10 p-3 rounded-lg">
-            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold mb-1">Borrow from your Circle</h2>
-            <p className="text-sm text-gray-600">
-              See who you can borrow from in your trust network
-            </p>
-          </div>
-        </div>
-
-        {/* TODO: Add borrowing UI - show available liquidity, borrow amounts, etc */}
-        <div className="text-gray-500 text-sm">Borrowing interface coming soon...</div>
-      </div>
-
-      <TrustNetwork />
+      <Borrow />
+      {/* <TrustNetwork /> */}
     </div>
   )
 }
