@@ -2,14 +2,14 @@ import { useState } from 'react'
 
 const slides = [
   {
-    title: 'Welcome to Raila Circles',
-    text: 'You need to import your Metri wallet to get started.',
-    screenshots: 3,
+    title: 'Add Your Wallet as External Owner',
+    text: 'In Metri, Settings, add a wallet you control as an external owner.',
+    screenshots: ['/screenshots/1.jpg', '/screenshots/2.jpg'],
   },
   {
-    title: 'Connect Your Safe',
-    text: 'Now connect with your Safe wallet using WalletConnect.',
-    screenshots: 2,
+    title: 'Connect Your Safe. You can find it in the QR icon at left of profile image.',
+    text: 'Now connect with Rabby using your Safe wallet address. Connect Institutional Wallet -> Safe.',
+    screenshots: ['/screenshots/3.jpg', '/screenshots/4.jpg'],
   },
 ]
 
@@ -32,42 +32,46 @@ export function OnboardingCarousel({ onComplete }: { onComplete: () => void }) {
       onClick={onComplete}
     >
       <div
-        className="bg-white rounded-2xl max-w-[600px] w-[90%] p-8 shadow-[0_4px_24px_rgba(0,0,0,0.2)]"
+        className="bg-white rounded-2xl max-w-[900px] w-[90%] max-h-[90vh] overflow-y-auto p-8 shadow-[0_4px_24px_rgba(0,0,0,0.2)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-center">
+        <div className="text-center mb-6">
           <h2 className="mb-4 text-2xl">{slide.title}</h2>
-          <p className="text-gray-600 mb-8">{slide.text}</p>
-
-          <div className="flex gap-4 justify-center mb-8 flex-wrap">
-            {Array.from({ length: slide.screenshots }).map((_, i) => (
-              <div
-                key={i}
-                className="w-40 h-[280px] bg-gradient-to-br from-[#ff9a56] to-[#ff6b35] rounded-xl opacity-90 shadow-[0_2px_8px_rgba(255,107,53,0.3)]"
-              />
-            ))}
-          </div>
+          <p className="text-gray-600">{slide.text}</p>
         </div>
 
-        <div className="flex flex-col gap-6 items-center">
-          <div className="flex gap-2">
-            {slides.map((_, i) => (
-              <div
+        <div className="flex gap-8 items-center">
+          <div className="flex gap-6 justify-center flex-wrap flex-1">
+            {slide.screenshots.map((src, i) => (
+              <img
                 key={i}
-                className={`h-2 rounded-full transition-all duration-200 ${
-                  i === currentSlide
-                    ? 'bg-[#ff6b35] w-6'
-                    : 'bg-gray-300 w-2'
-                }`}
+                src={src}
+                alt={`Screenshot ${i + 1}`}
+                className="w-64 rounded-xl shadow-lg"
               />
             ))}
           </div>
-          <button
-            onClick={handleNext}
-            className="bg-[#ff6b35] text-white border-none px-8 py-3 rounded-lg text-base font-semibold cursor-pointer hover:bg-[#ff5722] transition-colors"
-          >
-            {currentSlide < slides.length - 1 ? 'Next' : 'Get Started'}
-          </button>
+
+          <div className="flex flex-col gap-6 items-center">
+            <div className="flex gap-2">
+              {slides.map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-2 rounded-full transition-all duration-200 ${
+                    i === currentSlide
+                      ? 'bg-[#ff6b35] w-6'
+                      : 'bg-gray-300 w-2'
+                  }`}
+                />
+              ))}
+            </div>
+            <button
+              onClick={handleNext}
+              className="bg-[#ff6b35] text-white border-none px-8 py-3 rounded-lg text-base font-semibold cursor-pointer hover:bg-[#ff5722] transition-colors whitespace-nowrap"
+            >
+              {currentSlide < slides.length - 1 ? 'Next' : 'Get Started'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
