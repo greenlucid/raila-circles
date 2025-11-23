@@ -21,29 +21,13 @@ const wagmiConfig = createConfig({
 const queryClient = new QueryClient()
 
 function EnableModule() {
-  const { address, isConnected } = useAccount()
-
-  const { data: moduleEnabled, refetch } = useReadContract({
-    address: address,
-    abi: SAFE_ABI,
-    functionName: 'isModuleEnabled',
-    args: [MODULE_ADDRESS as `0x${string}`],
-    query: {
-      enabled: !!address && isConnected,
-    },
-  })
+  const { address } = useAccount()
 
   const { writeContract, data: hash, isPending } = useWriteContract()
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   })
-
-  useEffect(() => {
-    if (isSuccess) {
-      refetch()
-    }
-  }, [isSuccess, refetch])
 
   const handleEnableModule = () => {
     if (!address) return
@@ -56,39 +40,95 @@ function EnableModule() {
     })
   }
 
+  return (
+    <div className="flex flex-col gap-4">
+      <button
+        onClick={handleEnableModule}
+        disabled={isPending || isConfirming}
+        className="bg-[#ff6b35] text-white px-4 py-3 rounded-lg hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+      >
+        {isPending || isConfirming ? 'Enabling Module...' : 'Enable Module'}
+      </button>
+      {hash && (
+        <div className="text-sm text-gray-600">
+          Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+          {isConfirming && ' (confirming...)'}
+          {isSuccess && ' ✓'}
+        </div>
+      )}
+      <div className="text-xs text-gray-500">
+        Module: {MODULE_ADDRESS}
+      </div>
+    </div>
+  )
+}
+
+function LenderPanel() {
+  const { address, isConnected } = useAccount()
+
+  const { data: moduleEnabled } = useReadContract({
+    address: address,
+    abi: SAFE_ABI,
+    functionName: 'isModuleEnabled',
+    args: [MODULE_ADDRESS as `0x${string}`],
+    query: {
+      enabled: !!address && isConnected,
+    },
+  })
+
   if (!isConnected) return null
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-bold mb-4">Raila Module</h2>
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-4">
-          {moduleEnabled ? (
-            <div className="text-green-600 font-semibold">✓ Module Enabled</div>
-          ) : (
-            <>
-              <div className="text-gray-600">Module not enabled</div>
-              <button
-                onClick={handleEnableModule}
-                disabled={isPending || isConfirming}
-                className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff5722] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isPending || isConfirming ? 'Enabling...' : 'Enable Module'}
-              </button>
-            </>
-          )}
-        </div>
-        {hash && (
-          <div className="text-sm text-gray-600">
-            Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
-            {isConfirming && ' (confirming...)'}
-            {isSuccess && ' ✓'}
-          </div>
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold mb-2">Become a Lender or Relayer</h2>
+        <p className="text-sm text-gray-600 mb-6">
+          Enable the Raila module to lend to your trusted circle or act as a loan relayer
+        </p>
+
+        {!moduleEnabled ? (
+          <EnableModule />
+        ) : (
+          <div className="text-green-600 font-semibold mb-4">✓ Module Enabled</div>
         )}
       </div>
-      <div className="text-xs text-gray-500 mt-2">
-        Module: {MODULE_ADDRESS}
+
+      {moduleEnabled && <Settings moduleEnabled={true} />}
+    </div>
+  )
+}
+
+function BorrowerPanel() {
+  const { isConnected } = useAccount()
+
+  if (!isConnected) return null
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold mb-2">Borrow from your Circle</h2>
+        <p className="text-sm text-gray-600 mb-6">
+          See who you can borrow from in your trust network
+        </p>
+
+        {/* TODO: Add borrowing UI - show available liquidity, borrow amounts, etc */}
+        <div className="text-gray-500 text-sm">Borrowing interface coming soon...</div>
       </div>
+
+      <TrustNetwork />
+    </div>
+  )
+}
+
+function Dashboard() {
+  const { isConnected } = useAccount()
+
+  if (!isConnected) return null
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <LenderPanel />
+      <BorrowerPanel />
     </div>
   )
 }
@@ -275,23 +315,17 @@ function App() {
             onClose={handleOnboardingComplete}
           />
 
-          <div className="fixed top-4 right-4 flex items-center gap-3 z-10">
-            <HelpButton onClick={() => setShowHelp(true)} />
-            <ConnectButton />
-          </div>
-
-          <div className="max-w-3xl mx-auto px-8 py-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold">Raila Circles</h1>
-              <p className="text-gray-600 mt-1">
-                Web of lending through Circles trust graph
-              </p>
+          <div>
+            <div className="flex justify-between items-center px-4 py-3">
+              <h1 className="text-2xl font-bold">Raila Circles</h1>
+              <div className="flex items-center gap-3">
+                <HelpButton onClick={() => setShowHelp(true)} />
+                <ConnectButton />
+              </div>
             </div>
 
-            <div className="space-y-6">
-              <EnableModule />
-              <Settings />
-              <TrustNetwork />
+            <div className="px-4">
+              <Dashboard />
             </div>
           </div>
         </div>

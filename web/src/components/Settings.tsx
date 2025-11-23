@@ -33,7 +33,7 @@ const MODULE_ABI = [{
   outputs: [],
 }] as const
 
-export function Settings() {
+export function Settings({ moduleEnabled }: { moduleEnabled?: boolean }) {
   const { address } = useAccount()
 
   const { data: limits, refetch } = useReadContract({
@@ -98,7 +98,7 @@ export function Settings() {
     }
   }
 
-  if (!address) return null
+  if (!address || !moduleEnabled) return null
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
