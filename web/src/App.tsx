@@ -4,6 +4,7 @@ import { gnosis } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HelpButton, HelpModal } from './components/HelpModal'
+import { Settings } from './components/Settings'
 import { Sdk } from '@aboutcircles/sdk'
 import { circlesConfig } from '@aboutcircles/sdk-core'
 
@@ -246,14 +247,10 @@ function ConnectButton() {
 }
 
 function App() {
-  const [showHelp, setShowHelp] = useState(false)
-
-  useEffect(() => {
+  const [showHelp, setShowHelp] = useState(() => {
     const seen = localStorage.getItem('raila-onboarding-seen')
-    if (!seen) {
-      setShowHelp(true)
-    }
-  }, [])
+    return !seen
+  })
 
   const handleOnboardingComplete = () => {
     localStorage.setItem('raila-onboarding-seen', 'true')
@@ -280,7 +277,10 @@ function App() {
               <ConnectButton />
             </div>
 
-            <EnableModule />
+            <div className="space-y-6">
+              <EnableModule />
+              <Settings />
+            </div>
           </div>
         </div>
       </QueryClientProvider>
