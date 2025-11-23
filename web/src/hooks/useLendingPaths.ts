@@ -90,7 +90,7 @@ export function useLendingPaths(borrowerAddress: string | undefined, enabled: bo
 
       try {
         await findLendingPathsStreaming(
-          borrowerAddress,
+          borrowerAddress!,
           MAX_PATH_DEPTH,
           async (path) => {
             // Dedupe by path addresses

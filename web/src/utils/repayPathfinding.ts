@@ -45,7 +45,7 @@ export async function findRepayPaths(borrowerAddress: string): Promise<RepayPath
 
   // Get all addresses in trust network (will expand as we explore)
   const sdk = new Sdk(circlesConfig[100])
-  const relations = await sdk.data.getTrustRelations(borrowerAddress)
+  const relations = await sdk.data.getTrustRelations(borrowerAddress as `0x${string}`)
   const allAddresses = new Set<string>([borrowerAddress])
 
   relations.forEach((rel) => {
@@ -85,7 +85,7 @@ export async function findRepayPaths(borrowerAddress: string): Promise<RepayPath
     // Expand address set with this borrower's trust network
     if (currentBorrower !== borrowerAddress) {
       try {
-        const borrowerRelations = await sdk.data.getTrustRelations(currentBorrower)
+        const borrowerRelations = await sdk.data.getTrustRelations(currentBorrower as `0x${string}`)
         borrowerRelations.forEach((rel) => {
           const addr = rel.subjectAvatar === currentBorrower ? rel.objectAvatar : rel.subjectAvatar
           allAddresses.add(addr)

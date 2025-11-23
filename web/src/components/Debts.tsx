@@ -119,7 +119,7 @@ function RepayPathCard({ path, borrowerAddress }: { path: EnrichedRepayPath; bor
     address: USDC_ADDRESS as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: [borrowerAddress, MODULE_ADDRESS as `0x${string}`],
+    args: [borrowerAddress as `0x${string}`, MODULE_ADDRESS as `0x${string}`],
   })
 
   const { writeContract, data: hash, isPending } = useWriteContract()

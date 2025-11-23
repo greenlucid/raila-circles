@@ -99,7 +99,7 @@ export function Borrow() {
           {tiers.length > 0 && (
             <>
               {viewMode === 'orderbook' ? (
-                <OrderbookView tiers={tiers} borrowerAddress={address} />
+                <OrderbookView tiers={tiers} />
               ) : (
                 <>
                   <p className="text-sm text-gray-600 mb-4">
@@ -108,7 +108,7 @@ export function Borrow() {
 
                   <div className="space-y-3">
                     {tiers.map((tier, idx) => (
-                      <TierCard key={idx} tier={tier} borrowerAddress={address} />
+                      <TierCard key={idx} tier={tier} />
                     ))}
                   </div>
                 </>
@@ -146,7 +146,7 @@ function formatIR(ir: bigint): string {
   return aprPercent.toFixed(2)
 }
 
-function OrderbookView({ tiers }: { tiers: LiquidityTier[]; borrowerAddress: string }) {
+function OrderbookView({ tiers }: { tiers: LiquidityTier[] }) {
   const [borrowAmount, setBorrowAmount] = useState('')
 
   const { writeContract, data: hash, isPending } = useWriteContract()
@@ -318,7 +318,7 @@ function OrderbookView({ tiers }: { tiers: LiquidityTier[]; borrowerAddress: str
   )
 }
 
-function TierCard({ tier, borrowerAddress }: { tier: LiquidityTier; borrowerAddress: string }) {
+function TierCard({ tier }: { tier: LiquidityTier }) {
   const totalAvailableFormatted = parseFloat(formatUnits(tier.totalAvailable, 6)).toFixed(2)
 
   // Sort paths by liquidity (highest first) for display
@@ -329,7 +329,7 @@ function TierCard({ tier, borrowerAddress }: { tier: LiquidityTier; borrowerAddr
       {/* Individual path cards */}
       <div className="space-y-3 mb-3 max-w-2xl">
         {sortedPaths.map((path, idx) => (
-          <PathCard key={idx} path={path} borrowerAddress={borrowerAddress} />
+          <PathCard key={idx} path={path} />
         ))}
       </div>
 
@@ -353,7 +353,7 @@ function TierCard({ tier, borrowerAddress }: { tier: LiquidityTier; borrowerAddr
   )
 }
 
-function PathCard({ path, borrowerAddress }: { path: EnrichedLendingPath; borrowerAddress: string }) {
+function PathCard({ path }: { path: EnrichedLendingPath }) {
   const [borrowAmount, setBorrowAmount] = useState('')
   const [isExpanded, setIsExpanded] = useState(false)
 

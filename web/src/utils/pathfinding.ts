@@ -50,7 +50,7 @@ const MODULE_ABI = [{
  */
 export async function getTrusters(address: string): Promise<string[]> {
   const sdk = new Sdk(circlesConfig[100])
-  const relations = await sdk.data.getTrustRelations(address)
+  const relations = await sdk.data.getTrustRelations(address as `0x${string}`)
 
   // Filter for those who trust the address (trustedBy or mutuallyTrusts)
   const trusters = relations
@@ -111,7 +111,7 @@ export async function fetchUserSettings(addresses: string[]): Promise<Map<string
 
     if (limitsResult.status === 'success' && usdcBalanceResult.status === 'success') {
       const limits = limitsResult.result as unknown as readonly [bigint, bigint, bigint, bigint, bigint]
-      const usdcBalance = usdcBalanceResult.result as bigint
+      const usdcBalance = usdcBalanceResult.result as unknown as bigint
 
       settingsMap.set(addr, {
         address: addr,
